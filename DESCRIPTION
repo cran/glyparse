@@ -1,0 +1,30 @@
+Package: glyparse
+Title: Parsing Glycan Structure Text Representations
+Version: 0.5.3
+Authors@R: 
+    person("Bin", "Fu", , "23110220018@m.fudan.edu.cn", role = c("aut", "cre", "cph"),
+           comment = c(ORCID = "0000-0001-8567-2997"))
+Description: 
+    Provides functions to parse glycan structure text representations
+    into 'glyrepr' glycan structures. Currently, it supports StrucGP-style,
+    pGlyco-style, IUPAC-condensed, IUPAC-extended, IUPAC-short, WURCS,
+    Linear Code, and GlycoCT format. It also provides an automatic parser
+    to detect the format and parse the structure string.
+License: MIT + file LICENSE
+Suggests: knitr, rmarkdown, testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Encoding: UTF-8
+RoxygenNote: 7.3.3
+URL: https://glycoverse.github.io/glyparse/,
+        https://github.com/glycoverse/glyparse
+Imports: checkmate, cli, dplyr, glyrepr (>= 0.7.0), igraph, purrr,
+        rlang, rstackdeque, stringr
+Depends: R (>= 4.1)
+VignetteBuilder: knitr
+BugReports: https://github.com/glycoverse/glyparse/issues
+NeedsCompilation: no
+Packaged: 2025-11-01 07:09:21 UTC; fubin
+Author: Bin Fu [aut, cre, cph] (ORCID: <https://orcid.org/0000-0001-8567-2997>)
+Maintainer: Bin Fu <23110220018@m.fudan.edu.cn>
+Repository: CRAN
+Date/Publication: 2025-11-04 19:30:02 UTC

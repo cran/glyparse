@@ -9,6 +9,8 @@
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
 [![CRAN
 status](https://www.r-pkg.org/badges/version/glyparse)](https://CRAN.R-project.org/package=glyparse)
+[![R-universe
+version](https://glycoverse.r-universe.dev/glyparse/badges/version)](https://glycoverse.r-universe.dev/glyparse)
 [![R-CMD-check](https://github.com/glycoverse/glyparse/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/glycoverse/glyparse/actions/workflows/R-CMD-check.yaml)
 [![Codecov test
 coverage](https://codecov.io/gh/glycoverse/glyparse/graph/badge.svg)](https://app.codecov.io/gh/glycoverse/glyparse)
@@ -23,13 +25,26 @@ pGlyco-style.
 
 ## Installation
 
-You can install the latest release of glyparse from CRAN with:
+You can install the latest release of glyparse from
+[CRAN](https://CRAN.R-project.org/package=glyparse):
 
 ``` r
 install.packages("glyparse")
 ```
 
-Or install the development version from GitHub:
+Or from [r-universe](https://glycoverse.r-universe.dev/glyparse):
+
+``` r
+install.packages('glyparse', repos = c('https://glycoverse.r-universe.dev', 'https://cloud.r-project.org'))
+```
+
+Or from [GitHub](https://github.com/glycoverse/glyparse):
+
+``` r
+remotes::install_github("glycoverse/glyparse@*release")
+```
+
+Or install the development version:
 
 ``` r
 remotes::install_github("glycoverse/glyparse")

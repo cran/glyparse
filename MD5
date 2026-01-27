@@ -1,7 +1,7 @@
-2e509622a5b1b31491c6b6befda833ab *DESCRIPTION
+0f1a7a155588e93e4636d7fa3914d5af *DESCRIPTION
 6e54c335eebf332fc005cbdf45209ffe *LICENSE
 27b9ebe8b39ef0af192041ac225d406b *NAMESPACE
-81224b64e09d3855d12179cb0cc710c1 *NEWS.md
+f425e0a7c37a54b6e3a0dfe2454960f2 *NEWS.md
 a0ec50f8fe7ec7fa286ae070a8759be8 *R/auto-parse.R
 f4ffbb2409c60bf8b3e58dce37c30b74 *R/parse-glycoct.R
 7293df1e213ca8b5362a20babbfc07d2 *R/parse-iupac-condensed.R
@@ -13,7 +13,7 @@ c4e970b537df8fbba722a2474bd5d886 *R/parse-strucgp.R
 833034bbefd5b399bbca6d726e16ca84 *R/parse-wurcs.R
 77cbbc0c1d185f9630cf9813c634ce80 *R/struc-parser-wrapper.R
 7a539cce8175722007bf730a5f114081 *R/utils.R
-7deae1c22152f337f8e546a4fefe70fd *README.md
+7f0d64c29abfb95f0c6c2b79b9919161 *README.md
 1bf18d9c216b8d95033f0bd2fe2906b2 *build/partial.rdb
 17049bf591a350abe25bc1d599267f22 *build/vignette.rds
 228298510397bb084152a3d996d5d5a6 *inst/doc/glyparse.R
@@ -38,7 +38,7 @@ fbe00c51304b73f90f23b56d5c90209e *tests/testthat/_snaps/parse-strucgp.md
 811ffcc7a2150254c58ec74beac28e27 *tests/testthat/_snaps/parse-wurcs.md
 3da7c43faf1e3de73dcc3f60d82a95a5 *tests/testthat/checklist.R
 22ddc7e944de3a23ac84f6bb5028567f *tests/testthat/helper.R
-cf7e3c7f0ea3817c5379cbf320d3a2dd *tests/testthat/test-auto-parse.R
+b22d8d8d22ed599c4dada2acd7c291cb *tests/testthat/test-auto-parse.R
 7e125294caf41421a8e799a87f0aeced *tests/testthat/test-parse-glycoct.R
 b9acf8a70c137b71945bbd66faa2e559 *tests/testthat/test-parse-iupac-condensed.R
 6b001de24d249dd6cbbf3555ff95fdbb *tests/testthat/test-parse-iupac-extended.R

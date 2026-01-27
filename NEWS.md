@@ -1,3 +1,9 @@
+# glyparse 0.5.4
+
+## Minor improvements and fixes
+
+* Adapt to glyrepr 0.10.0.
+
 # glyparse 0.5.3
 
 ## Minor improvements and fixes

@@ -1,6 +1,6 @@
 Package: glyparse
 Title: Parsing Glycan Structure Text Representations
-Version: 0.5.4
+Version: 0.5.5
 Authors@R: 
     person("Bin", "Fu", , "23110220018@m.fudan.edu.cn", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0001-8567-2997"))
@@ -23,8 +23,8 @@ Depends: R (>= 4.1)
 VignetteBuilder: knitr
 BugReports: https://github.com/glycoverse/glyparse/issues
 NeedsCompilation: no
-Packaged: 2026-01-27 07:38:49 UTC; fubin
+Packaged: 2026-02-04 03:08:04 UTC; fubin
 Author: Bin Fu [aut, cre, cph] (ORCID: <https://orcid.org/0000-0001-8567-2997>)
 Maintainer: Bin Fu <23110220018@m.fudan.edu.cn>
 Repository: CRAN
-Date/Publication: 2026-01-27 07:50:12 UTC
+Date/Publication: 2026-02-04 03:20:02 UTC

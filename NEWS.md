@@ -1,3 +1,10 @@
+# glyparse 0.5.5
+
+## Minor improvements and bug fixes
+
+* All parser functions now preserve names of input character vectors.
+* All parser functions now supports NA values in the input character vectors.
+
 # glyparse 0.5.4
 
 ## Minor improvements and fixes

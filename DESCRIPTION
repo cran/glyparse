@@ -1,6 +1,6 @@
 Package: glyparse
 Title: Parsing Glycan Structure Text Representations
-Version: 0.5.5
+Version: 0.5.6
 Authors@R: 
     person("Bin", "Fu", , "23110220018@m.fudan.edu.cn", role = c("aut", "cre", "cph"),
            comment = c(ORCID = "0000-0001-8567-2997"))
@@ -18,13 +18,13 @@ RoxygenNote: 7.3.3
 URL: https://glycoverse.github.io/glyparse/,
         https://github.com/glycoverse/glyparse
 Imports: checkmate, cli, dplyr, glyrepr (>= 0.9.0), igraph, purrr,
-        rlang, rstackdeque, stringr
+        rlang, rstackdeque, stringr, vctrs
 Depends: R (>= 4.1)
 VignetteBuilder: knitr
 BugReports: https://github.com/glycoverse/glyparse/issues
 NeedsCompilation: no
-Packaged: 2026-02-04 03:08:04 UTC; fubin
+Packaged: 2026-02-24 07:13:19 UTC; fubin
 Author: Bin Fu [aut, cre, cph] (ORCID: <https://orcid.org/0000-0001-8567-2997>)
 Maintainer: Bin Fu <23110220018@m.fudan.edu.cn>
 Repository: CRAN
-Date/Publication: 2026-02-04 03:20:02 UTC
+Date/Publication: 2026-02-24 07:30:02 UTC

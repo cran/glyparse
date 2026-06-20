@@ -161,6 +161,47 @@ test_that("GlycoCT: GlcA3S(?1-?)Gal(?1-?)GlcNAc(?1-, (Unknown linkages and anome
   expect_equal(result, expected)
 })
 
+test_that("GlycoCT handles unknown reducing-end ring bounds", {
+  glycoct <- "RES\n1b:x-dglc-HEX-x:x"
+
+  result <- parse_glycoct(glycoct)
+  graph <- glyrepr::get_structure_graphs(result)
+
+  expect_equal(as.character(result), "Glc(??-")
+  expect_equal(graph$anomer, "??")
+})
+
+test_that("GlycoCT matches amino sugars with unknown ring bounds", {
+  glycoct <- paste0(
+    "RES\n",
+    "1b:x-dglc-HEX-x:x\n",
+    "2s:amino\n",
+    "LIN\n",
+    "1:1d(2+1)2n"
+  )
+
+  expect_equal(as.character(parse_glycoct(glycoct)), "GlcN(??-")
+})
+
+test_that("GlycoCT handles N-sulfated amino sugars with unknown ring bounds", {
+  glycoct <- paste0(
+    "RES\n",
+    "1b:x-dglc-HEX-x:x\n",
+    "2s:amino\n",
+    "3s:sulfate\n",
+    "LIN\n",
+    "1:1d(2+1)2n\n",
+    "2:1d(2+1)3n"
+  )
+
+  result <- parse_glycoct(glycoct)
+  graph <- glyrepr::get_structure_graphs(result)
+
+  expect_equal(as.character(result), "GlcN2S(??-")
+  expect_equal(igraph::vertex_attr(graph, "mono"), "GlcN")
+  expect_equal(igraph::vertex_attr(graph, "sub"), "2S")
+})
+
 test_that("all monosaccharides can be parsed", {
   expect_mono_equal <- function(x, expected) {
     graph <- glyrepr::get_structure_graphs(x, return_list = FALSE)

@@ -94,6 +94,7 @@ parse_res_section <- function(res_lines) {
       residues[[as.character(id)]] <- list(
         type = "mono",
         anomer = anomer,
+        anomer_pos = extract_glycoct_anomer_pos(mono_info),
         content = mono_info,
         substituents = list()
       )
@@ -107,6 +108,59 @@ parse_res_section <- function(res_lines) {
   }
 
   residues
+}
+
+#' Extract the anomeric position from a GlycoCT monosaccharide descriptor
+#'
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A character scalar with the anomeric position, or `NA`.
+#' @noRd
+extract_glycoct_anomer_pos <- function(content) {
+  stringr::str_extract(content, "-(\\d+|x):", group = 1)
+}
+
+#' Extract the ring-bounds component from a GlycoCT monosaccharide descriptor
+#'
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A character scalar with the ring bounds, or `NA`.
+#' @noRd
+extract_glycoct_ring_bounds <- function(content) {
+  stringr::str_extract(content, "-((?:\\d+|x):(?:\\d+|x))", group = 1)
+}
+
+#' Remove the ring-bounds component from a GlycoCT monosaccharide descriptor
+#'
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A normalized descriptor used for monosaccharide matching.
+#' @noRd
+remove_glycoct_ring_bounds <- function(content) {
+  stringr::str_remove(content, "-(?:\\d+|x):(?:\\d+|x)")
+}
+
+#' Check whether two GlycoCT monosaccharide descriptors are compatible
+#'
+#' @param x,y GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A logical scalar.
+#' @noRd
+glycoct_mono_content_matches <- function(x, y) {
+  same_core <- remove_glycoct_ring_bounds(x) == remove_glycoct_ring_bounds(y)
+  if (!same_core) {
+    return(FALSE)
+  }
+
+  x_bounds <- extract_glycoct_ring_bounds(x)
+  y_bounds <- extract_glycoct_ring_bounds(y)
+  if (is.na(x_bounds) || is.na(y_bounds)) {
+    return(identical(x_bounds, y_bounds))
+  }
+
+  identical(x_bounds, y_bounds) ||
+    stringr::str_detect(x_bounds, "x") ||
+    stringr::str_detect(y_bounds, "x")
 }
 
 parse_lin_section <- function(lin_lines) {
@@ -225,24 +279,35 @@ build_glycoct_graph <- function(residues, linkages) {
   # Set graph attributes (reducing end properties)
   reducing_end <- find_reducing_end(consolidated$vertices, consolidated$edges)
   if (!is.null(reducing_end)) {
-    # Get the anomer position for this monosaccharide
-    anomer_pos <- decide_anomer_pos(reducing_end$mono)
-    # Combine anomer configuration with position
-    anomer_config <- stringr::str_extract(reducing_end$anomer, "^[abx]")
-    if (is.na(anomer_config)) {
-      anomer_config <- "?"
-    }
-    # Handle unknown anomer configuration
-    if (anomer_config == "x") {
-      anomer_config <- "?"
-    }
-    g$anomer <- paste0(anomer_config, anomer_pos)
+    g$anomer <- format_glycoct_reducing_anomer(reducing_end)
   } else {
     g$anomer <- "?1"
   }
   g$alditol <- FALSE
 
   g
+}
+
+#' Format the reducing-end anomer stored in a GlycoCT graph
+#'
+#' @param reducing_end A consolidated reducing-end vertex.
+#'
+#' @return A character scalar such as `"a1"`, `"?1"`, or `"??"`.
+#' @noRd
+format_glycoct_reducing_anomer <- function(reducing_end) {
+  anomer_config <- stringr::str_extract(reducing_end$anomer, "^[abx]")
+  if (is.na(anomer_config) || anomer_config == "x") {
+    anomer_config <- "?"
+  }
+
+  anomer_pos <- reducing_end$anomer_pos
+  if (is.null(anomer_pos) || is.na(anomer_pos)) {
+    anomer_pos <- decide_anomer_pos(reducing_end$mono)
+  } else if (anomer_pos == "x") {
+    anomer_pos <- "?"
+  }
+
+  paste0(anomer_config, anomer_pos)
 }
 
 load_mono_mappings <- function() {
@@ -576,7 +641,8 @@ consolidate_residues <- function(residues, linkages, mono_mappings) {
             original_id = group[1],
             mono = mono_name,
             sub = "",
-            anomer = res$anomer
+            anomer = res$anomer,
+            anomer_pos = res$anomer_pos
           ))
         )
       }
@@ -610,7 +676,8 @@ consolidate_residues <- function(residues, linkages, mono_mappings) {
               original_id = main_mono_id,
               mono = matched,
               sub = "",
-              anomer = main_mono$anomer
+              anomer = main_mono$anomer,
+              anomer_pos = main_mono$anomer_pos
             ))
           )
         } else {
@@ -627,7 +694,8 @@ consolidate_residues <- function(residues, linkages, mono_mappings) {
               original_id = main_mono_id,
               mono = partial_result$mono,
               sub = partial_result$sub,
-              anomer = main_mono$anomer
+              anomer = main_mono$anomer,
+              anomer_pos = main_mono$anomer_pos
             ))
           )
         }
@@ -750,7 +818,11 @@ match_partial_composite_structure <- function(
 
         # Check if monosaccharide matches
         if (
-          !is.null(group_mono) && group_mono$content == pattern_mono_content
+          !is.null(group_mono) &&
+            glycoct_mono_content_matches(
+              group_mono$content,
+              pattern_mono_content
+            )
         ) {
           # Verify that the pattern substituents actually match with correct linkages
           # by using the full pattern matching function
@@ -939,7 +1011,7 @@ matches_glycoct_pattern <- function(group, residues, linkages, mapping) {
   # Compare structures - exact match for monosaccharide content
   mono_match <- !is.null(group_mono) &&
     !is.null(pattern_mono) &&
-    group_mono == pattern_mono
+    glycoct_mono_content_matches(group_mono, pattern_mono)
 
   subs_match <- length(group_subs) == length(pattern_subs) &&
     all(sort(group_subs) == sort(pattern_subs))
@@ -962,7 +1034,7 @@ map_single_mono <- function(content) {
       mono_line <- mapping$res[[1]]
       if (stringr::str_detect(mono_line, "^\\d+b:")) {
         pattern_content <- stringr::str_remove(mono_line, "^\\d+b:[abx]-")
-        if (content == pattern_content) {
+        if (glycoct_mono_content_matches(content, pattern_content)) {
           return(mono_name)
         }
       }

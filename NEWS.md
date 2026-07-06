@@ -1,3 +1,22 @@
+# glyparse 0.7.0
+
+## New features
+
+* `auto_parse()` now detects GlyCAM IUPAC, IUPAC-compact, KCF, and LINUCS structures and routes them to the corresponding parser (#26, #28, #30, #31).
+* Parser functions gain a `progress` argument for opt-in progress bars when parsing large inputs (#29).
+* New `parse_glycam_iupac()` parses GlyCAM IUPAC structures (#25, #27).
+* New `parse_iupac_compact()` parses IUPAC-compact structures (#28).
+* New `parse_kcf()` parses KCF structures (#30).
+* New `parse_linucs()` parses LINUCS structures (#31).
+
+## Minor improvements and bug fixes
+
+* `parse_glycoct()` now accepts space-separated GlycoCT records, such as records stored in CSV exports (#24).
+* `parse_glycoct()` now parses GlycoCT alditol residues as regular reducing-end glycans with unknown anomer configurations (#22).
+* `parse_glycoct()` now supports generic GlycoCT `HEX`, N-acetylated `HEX`, deoxy-`HEX`, and sialic acid descriptors, including direct `n-sulfate` substituents on amino sugars (#24).
+* `parse_wurcs()` now parses WURCS alditol residues as regular reducing-end glycans with unknown anomer configurations (#21).
+* `parse_wurcs()` now supports additional generic residue descriptors, ambiguous sialic acid descriptors, and uppercase residue IDs for large structures (#23).
+
 # glyparse 0.6.1
 
 ## Minor improvements and bug fixes
@@ -123,9 +142,11 @@
 
 * Better error messages.
   Before:
+
   ```r
   > parse_iupac_condensed("bad_glycan")
   ```
+
   ```
   Error in `purrr::map()` at glyparse/R/struc-parser-wrapper.R:13:3:
   ℹ In index: 1.
@@ -134,10 +155,13 @@
   ℹ Invalid characters or format in IUPAC-condensed string
   Run `rlang::last_trace()` to see where the error occurred.
   ```
+
   Now:
+
   ```r
   > parse_iupac_condensed("bad_glycan")
   ```
+
   ```
   Error in `parse_iupac_condensed()`:
   ! Can't parse: "bad_glycan"

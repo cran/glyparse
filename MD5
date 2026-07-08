@@ -1,7 +1,7 @@
-bb67aabbbc53a8ed64db1c0259bdd2a7 *DESCRIPTION
+ab54cb51e82f8bb153c092c6edde9205 *DESCRIPTION
 6e54c335eebf332fc005cbdf45209ffe *LICENSE
 496617d1f947811c30b7833cb488ef54 *NAMESPACE
-8cdfbd280d249f0bd5a2196dc0117683 *NEWS.md
+8dc15a6c5022257ef7c83822b234249f *NEWS.md
 26ce16680729aac57b0c4bce2615b853 *R/auto-parse.R
 bafb8408f48b50aca2c9ff7f6863c35c *R/parse-glycam-iupac.R
 990127ede576aba406bc2388194229ed *R/parse-glycoct.R
@@ -15,14 +15,14 @@ c5006cb33ede25ed3fb8098d91302aeb *R/parse-linucs.R
 7e75df84ff40265b05d01378b0fe49f4 *R/parse-pglyco.R
 09e219d81885ec184c73c5b717c17c75 *R/parse-strucgp.R
 23cbf3991643273e236bb1babce6fc18 *R/parse-wurcs.R
-3c99d07223bcf3409e392e58c5d652da *R/struc-parser-wrapper.R
+b7acd08412c3aada43e8aaadd537ade9 *R/struc-parser-wrapper.R
 6172f1a1990e39abcd7286dca9b1a8c6 *R/utils.R
 4716bb7e6703086fcadebae027907e58 *README.md
 533839446f70bde34a1050627ce80586 *build/partial.rdb
 2dceb129b087bf2814a293c910066086 *build/vignette.rds
 228298510397bb084152a3d996d5d5a6 *inst/doc/glyparse.R
 90ca753f014d6a8b266e9b47af0983e0 *inst/doc/glyparse.Rmd
-b2af6547d24a7346ee279f4759c56f2e *inst/doc/glyparse.html
+f3aeb14ba71ccb476b8d9c8f691173e9 *inst/doc/glyparse.html
 cd7945b48d92ae91f1915742a7d7f72a *man/auto_parse.Rd
 0877aec8d54b439c7e71d5d55ac0f3e0 *man/figures/logo.png
 fa1b2cb8946d094b7fa56344d158cb30 *man/parse_glycam_iupac.Rd
@@ -49,7 +49,7 @@ fbe00c51304b73f90f23b56d5c90209e *tests/testthat/_snaps/parse-strucgp.md
 3d2f56d33e8ac76c9ac592960990ef18 *tests/testthat/test-auto-parse.R
 a71bf6f89557dc9bfb6f67658cda43cf *tests/testthat/test-na-support.R
 4f0456882b226a97811333a4e02ef2bd *tests/testthat/test-name-preservation.R
-b473fcc705c78b834e4532821f591b48 *tests/testthat/test-parse-glycam-iupac.R
+92857af20730da68cb086172405bbf7f *tests/testthat/test-parse-glycam-iupac.R
 df2cb590be4ce8f066e5537eacd8500d *tests/testthat/test-parse-glycoct.R
 b12fdaa0d0de0ee756fd132249e8d18c *tests/testthat/test-parse-iupac-compact.R
 b9acf8a70c137b71945bbd66faa2e559 *tests/testthat/test-parse-iupac-condensed.R
@@ -61,6 +61,7 @@ c858ba5ff81a9985ac36c001ed71fa41 *tests/testthat/test-parse-linucs.R
 6750fe8f3ef41233a5d1083bd352986f *tests/testthat/test-parse-pglyco.R
 1f48855cc63a3140eece180e60863a45 *tests/testthat/test-parse-strucgp.R
 623a50bd0fa9df95e83d3bbc698b0f43 *tests/testthat/test-parse-wurcs.R
-321f926cb76d2fdeae1f73576e528ddc *tests/testthat/test-performance.R
+24c43e8a91b7cd09441fb482fccf6030 *tests/testthat/test-performance.R
 0df86dd08319a2e0f4537990c8353f27 *tests/testthat/test-progress.R
+c8987c226ab51b80081da599a934cc00 *tests/testthat/test-struc-parser-wrapper.R
 90ca753f014d6a8b266e9b47af0983e0 *vignettes/glyparse.Rmd

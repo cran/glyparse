@@ -29,6 +29,25 @@ test_that("GlyCAM IUPAC parses generic monosaccharides alone", {
   expect_identical(as.character(parsed), c(Hex = "Hex(b1-"))
 })
 
+test_that("GlyCAM IUPAC preserves unusual configurations", {
+  parsed <- parse_glycam_iupac(c(
+    natural_fucose = "LFucpa1-OH",
+    d_fucose = "DFucp[3S]a1-OH",
+    l_gulose = "LGulpb1-OH",
+    d_fucofuranose = "DFucfa1-OH"
+  ))
+
+  expect_identical(
+    as.character(parsed),
+    c(
+      natural_fucose = "Fuc(a1-",
+      d_fucose = "D-Fuc3S(a1-",
+      l_gulose = "L-Gul(b1-",
+      d_fucofuranose = "D-Fucf(a1-"
+    )
+  )
+})
+
 test_that("GlyCAM IUPAC parses checklist monosaccharide names", {
   skip_on_old_win()
 
@@ -153,7 +172,7 @@ test_that("GlyCAM IUPAC parses checklist monosaccharide names", {
       Dig = "Dig(b1-",
       Col = "Col(b1-",
       Ara = "Ara(b1-",
-      Lyx = "Lyx(b1-",
+      Lyx = "L-Lyx(b1-",
       Xyl = "Xyl(b1-",
       Rib = "Rib(b1-",
       Neu5Ac = "Neu5Ac(b2-",
@@ -171,13 +190,33 @@ test_that("GlyCAM IUPAC parses checklist monosaccharide names", {
       MurNAc = "MurNAc(b1-",
       MurNGc = "MurNGc(b1-",
       Mur = "Mur(b1-",
-      Api = "Api(b1-",
+      Api = "D-Apif(b1-",
       Fru = "Fru(b2-",
       Tag = "Tag(b2-",
       Sor = "Sor(b2-",
       Psi = "Psi(b2-"
     )
   )
+})
+
+test_that("GlyCAM IUPAC parses every mapped furanose monosaccharide", {
+  mono_map <- glycam_iupac_mono_map()
+  furanose <- intersect(
+    unname(furanose_monosaccharide_map()),
+    unname(mono_map)
+  )
+  source_names <- names(mono_map)[match(furanose, mono_map)]
+  anomer_pos <- glyrepr::get_anomer_pos(furanose)
+  input <- paste0(source_names, "?", anomer_pos, "-OH")
+
+  parsed <- parse_glycam_iupac(input)
+  graphs <- glyrepr::get_structure_graphs(parsed, return_list = TRUE)
+
+  expect_identical(purrr::map_chr(graphs, ~ igraph::V(.x)$mono), furanose)
+})
+
+test_that("GlyCAM IUPAC rejects malformed Api furanose aliases", {
+  expect_error(parse_glycam_iupac("DAfifb1-OH"), "Can't parse")
 })
 
 test_that("GlyCAM IUPAC converts residue modifiers", {

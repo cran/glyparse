@@ -4,7 +4,7 @@
 \alias{parse_glycoct}
 \title{Parse GlycoCT Structures}
 \usage{
-parse_glycoct(x, on_failure = "error", progress = FALSE)
+parse_glycoct(x, on_failure = "error", progress = FALSE, validate = TRUE)
 }
 \arguments{
 \item{x}{A character vector of GlycoCT strings. NA values are allowed and will be returned as NA structures.}
@@ -13,6 +13,9 @@ parse_glycoct(x, on_failure = "error", progress = FALSE)
 structure cannot be parsed. \code{"na"} returns \code{NA} at invalid positions.}
 
 \item{progress}{Whether to show a progress bar while parsing.}
+
+\item{validate}{Whether to validate parsed glycan graphs before constructing
+the result.}
 }
 \value{
 A \code{\link[glyrepr:glycan_structure]{glyrepr::glycan_structure()}} object.
@@ -22,14 +25,16 @@ This function parses GlycoCT strings into a \code{\link[glyrepr:glycan_structure
 GlycoCT is a format used by databases like GlyTouCan and GlyGen.
 }
 \details{
-GlycoCT format consists of two parts:
+GlycoCT format consists of:
 \itemize{
 \item RES: Contains monosaccharides (lines starting with 'b:') and substituents (lines starting with 's:')
 \item LIN: Contains linkage information between residues
+\item UND: Contains floating substructures or substituents whose attachment to
+the main glycan is unresolved
 }
 
-Alditol residues are parsed as regular reducing-end glycans with unknown
-anomer configurations.
+Main reducing-end alditol residues retain their alditol status and use an
+unknown anomer configuration.
 
 For more information about GlycoCT format, see the glycoct.md documentation.
 }

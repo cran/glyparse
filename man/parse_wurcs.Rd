@@ -4,7 +4,7 @@
 \alias{parse_wurcs}
 \title{Parse WURCS Structures}
 \usage{
-parse_wurcs(x, on_failure = "error", progress = FALSE)
+parse_wurcs(x, on_failure = "error", progress = FALSE, validate = TRUE)
 }
 \arguments{
 \item{x}{A character vector of WURCS strings. NA values are allowed and will be returned as NA structures.}
@@ -13,6 +13,9 @@ parse_wurcs(x, on_failure = "error", progress = FALSE)
 structure cannot be parsed. \code{"na"} returns \code{NA} at invalid positions.}
 
 \item{progress}{Whether to show a progress bar while parsing.}
+
+\item{validate}{Whether to validate parsed glycan graphs before constructing
+the result.}
 }
 \value{
 A \code{\link[glyrepr:glycan_structure]{glyrepr::glycan_structure()}} object.
@@ -21,8 +24,14 @@ A \code{\link[glyrepr:glycan_structure]{glyrepr::glycan_structure()}} object.
 This function parses WURCS strings into a \code{\link[glyrepr:glycan_structure]{glyrepr::glycan_structure()}}.
 Currently, only WURCS 2.0 is supported.
 For more information about WURCS, see \href{https://github.com/glycoinfo/WURCS/wiki}{WURCS}.
-Alditol residues are parsed as regular reducing-end glycans with unknown
-anomer configurations.
+Main reducing-end alditol residues retain their alditol status and use an
+unknown anomer configuration.
+Ambiguous alternative linkage groups are represented as floating glycan
+parts when their child residue or subtree is not localized to one parent.
+Candidate parents may belong to the main glycan or another floating
+component.
+Floating substituents preserve their chemistry, carbon-position ambiguity,
+and candidate parent residues across the complete structure.
 }
 \examples{
 wurcs <- paste0(

@@ -4,12 +4,14 @@
 #' GlycoCT is a format used by databases like GlyTouCan and GlyGen.
 #'
 #' @details
-#' GlycoCT format consists of two parts:
+#' GlycoCT format consists of:
 #' - RES: Contains monosaccharides (lines starting with 'b:') and substituents (lines starting with 's:')
 #' - LIN: Contains linkage information between residues
+#' - UND: Contains floating substructures or substituents whose attachment to
+#'   the main glycan is unresolved
 #'
-#' Alditol residues are parsed as regular reducing-end glycans with unknown
-#' anomer configurations.
+#' Main reducing-end alditol residues retain their alditol status and use an
+#' unknown anomer configuration.
 #'
 #' For more information about GlycoCT format, see the glycoct.md documentation.
 #'
@@ -17,6 +19,8 @@
 #' @param on_failure How to handle parsing failures. `"error"` aborts when a
 #'   structure cannot be parsed. `"na"` returns `NA` at invalid positions.
 #' @param progress Whether to show a progress bar while parsing.
+#' @param validate Whether to validate parsed glycan graphs before constructing
+#'   the result.
 #'
 #' @return A [glyrepr::glycan_structure()] object.
 #'
@@ -33,51 +37,201 @@
 #' parse_glycoct(glycoct)
 #'
 #' @export
-parse_glycoct <- function(x, on_failure = "error", progress = FALSE) {
+parse_glycoct <- function(
+  x,
+  on_failure = "error",
+  progress = FALSE,
+  validate = TRUE
+) {
+  on_failure <- validate_struc_parser_wrapper_args(
+    x,
+    on_failure,
+    progress,
+    validate,
+    call = rlang::caller_env()
+  )
   struc_parser_wrapper(
     x,
     do_parse_glycoct,
     on_failure = on_failure,
-    progress = progress
+    progress = progress,
+    validate = validate
   )
 }
 
 do_parse_glycoct <- function(x) {
   lines <- split_glycoct_lines(x)
+  blocks <- split_glycoct_blocks(lines)
 
-  # Find RES and LIN sections
+  main <- parse_glycoct_block(blocks$main)
+  floating <- purrr::map(blocks$floating, parse_glycoct_und_block)
+  main_graph <- build_glycoct_graph_data(main$residues, main$linkages)
+  main_alditol_count <- sum(purrr::map_lgl(
+    main_graph$vertices,
+    ~ isTRUE(.x$is_alditol)
+  ))
+  has_unrepresented_main_alditol <- main_alditol_count >
+    as.integer(isTRUE(main_graph$graph$alditol))
+  has_floating_alditol <- any(purrr::map_lgl(
+    floating,
+    ~ has_glycoct_alditol_residue(.x$residues)
+  ))
+  if (has_unrepresented_main_alditol || has_floating_alditol) {
+    warn_glycoct_unrepresented_alditol()
+  }
+
+  if (length(blocks$floating) == 0) {
+    return(main_graph$graph)
+  }
+
+  floating_substituents <- purrr::keep(
+    floating,
+    is_glycoct_floating_substituent
+  )
+  floating <- purrr::discard(
+    floating,
+    is_glycoct_floating_substituent
+  )
+  floating_graphs <- purrr::map(
+    floating,
+    ~ build_glycoct_graph_data(.x$residues, .x$linkages)
+  )
+
+  build_glycoct_floating_graph(
+    main_graph,
+    floating_graphs,
+    floating,
+    floating_substituents
+  )
+}
+
+#' Split a GlycoCT record into its main and UND blocks
+#'
+#' @param lines Tokenized GlycoCT lines.
+#'
+#' @return A list containing the main block and zero or more floating blocks.
+#' @noRd
+split_glycoct_blocks <- function(lines) {
+  und_marker <- which(lines == "UND")
+  if (length(und_marker) == 0) {
+    return(list(main = lines, floating = list()))
+  }
+
+  first_und <- und_marker[[1]]
+  main <- lines[seq_len(first_und - 1L)]
+  und_lines <- lines[(first_und + 1L):length(lines)]
+  starts <- which(stringr::str_detect(und_lines, "^UND\\d+:"))
+  if (length(starts) == 0) {
+    cli::cli_abort("No UND block found after the GlycoCT UND section")
+  }
+
+  ends <- c(starts[-1] - 1L, length(und_lines))
+  floating <- purrr::map2(
+    starts,
+    ends,
+    ~ und_lines[.x:.y]
+  )
+
+  list(main = main, floating = floating)
+}
+
+#' Parse the structural sections of one GlycoCT block
+#'
+#' @param lines Lines containing one RES section and an optional LIN section.
+#'
+#' @return Parsed residues and linkages.
+#' @noRd
+parse_glycoct_block <- function(lines) {
   res_start <- which(lines == "RES")
   lin_start <- which(lines == "LIN")
 
-  if (length(res_start) == 0) {
-    cli::cli_abort("No RES section found in GlycoCT string")
+  if (length(res_start) != 1) {
+    cli::cli_abort("A GlycoCT block must contain exactly one RES section")
+  }
+  if (length(lin_start) > 1) {
+    cli::cli_abort("A GlycoCT block can contain at most one LIN section")
   }
 
-  # Parse RES section
-  if (length(lin_start) == 0) {
-    res_lines <- lines[(res_start + 1):length(lines)]
+  res_end <- if (length(lin_start) == 0) {
+    length(lines)
   } else {
-    res_lines <- lines[(res_start + 1):(lin_start - 1)]
+    lin_start - 1L
   }
-
-  # Parse LIN section (if exists)
-  if (length(lin_start) > 0) {
-    lin_lines <- lines[(lin_start + 1):length(lines)]
+  res_lines <- lines[(res_start + 1L):res_end]
+  lin_lines <- if (length(lin_start) == 0) {
+    character()
   } else {
-    lin_lines <- character(0)
+    lines[(lin_start + 1L):length(lines)]
   }
 
-  # Parse residues (monosaccharides and substituents)
-  residues <- parse_res_section(res_lines)
-  if (has_glycoct_alditol_residue(residues)) {
-    warn_glycoct_alditol()
+  list(
+    residues = parse_res_section(res_lines),
+    linkages = parse_lin_section(lin_lines)
+  )
+}
+
+#' Parse a GlycoCT UND block
+#'
+#' @param lines One UND block, beginning with its UND identifier.
+#'
+#' @return Parsed structural data and virtual attachment metadata.
+#' @noRd
+parse_glycoct_und_block <- function(lines) {
+  parent_line <- lines[stringr::str_detect(lines, "^ParentIDs:")]
+  linkage_line <- lines[
+    stringr::str_detect(lines, "^SubtreeLinkageID\\d+:")
+  ]
+  if (length(parent_line) != 1 || length(linkage_line) != 1) {
+    cli::cli_abort(
+      "A GlycoCT UND block must contain one ParentIDs and one SubtreeLinkageID field"
+    )
   }
 
-  # Parse linkages
-  linkages <- parse_lin_section(lin_lines)
+  parent_text <- stringr::str_remove(parent_line, "^ParentIDs:")
+  parent_ids <- as.integer(stringr::str_split(parent_text, "\\|")[[1]])
+  if (length(parent_ids) == 0 || anyNA(parent_ids)) {
+    cli::cli_abort("GlycoCT UND ParentIDs must contain residue identifiers")
+  }
 
-  # Build the graph
-  build_glycoct_graph(residues, linkages)
+  attachment <- stringr::str_remove(
+    linkage_line,
+    "^SubtreeLinkageID\\d+:"
+  )
+  matches <- stringr::str_match(
+    attachment,
+    "^[a-z]?\\((-?\\d+(?:\\|\\d+)*)\\+(-?\\d+(?:\\|\\d+)*)\\)[a-z]?$"
+  )
+  if (is.na(matches[1])) {
+    cli::cli_abort(
+      "Can't parse GlycoCT UND subtree linkage {.val {attachment}}"
+    )
+  }
+  if (stringr::str_detect(matches[3], stringr::fixed("|"))) {
+    cli::cli_abort(
+      "GlycoCT UND linkages with alternative donor positions are not supported: {.val {attachment}}"
+    )
+  }
+
+  block <- parse_glycoct_block(lines)
+  c(
+    block,
+    list(
+      parent_ids = parent_ids,
+      parent_pos = matches[2],
+      child_pos = matches[3]
+    )
+  )
+}
+
+#' Detect a substituent-only GlycoCT UND block
+#'
+#' @param block Parsed UND block data.
+#'
+#' @return A logical scalar.
+#' @noRd
+is_glycoct_floating_substituent <- function(block) {
+  length(block$residues) == 1L &&
+    identical(block$residues[[1]]$type, "sub")
 }
 
 #' Split a GlycoCT record into parser lines
@@ -149,8 +303,7 @@ parse_res_section <- function(res_lines) {
 #' @return A logical scalar.
 #' @noRd
 is_glycoct_alditol_mono <- function(content) {
-  isTRUE(stringr::str_detect(content, "-0:0")) &&
-    isTRUE(stringr::str_detect(content, "\\|1:aldi"))
+  isTRUE(stringr::str_detect(content, "\\|1:aldi"))
 }
 
 #' Check whether parsed GlycoCT residues contain an alditol
@@ -166,14 +319,14 @@ has_glycoct_alditol_residue <- function(residues) {
   ))
 }
 
-#' Warn about alditol normalization in GlycoCT parsing
+#' Warn about unrepresented alditol normalization in GlycoCT parsing
 #'
 #' @return `NULL`, invisibly.
 #' @noRd
-warn_glycoct_alditol <- function() {
+warn_glycoct_unrepresented_alditol <- function() {
   cli::cli_warn(c(
-    "Alditol GlycoCT residues are parsed as regular reducing-end glycans with unknown anomer configurations.",
-    "i" = "For example, GlcNAc-ol is returned as GlcNAc(?1-."
+    "Only the main reducing-end GlycoCT residue can retain alditol status.",
+    "i" = "Other alditol residues are parsed as regular residues."
   ))
   invisible(NULL)
 }
@@ -196,6 +349,55 @@ extract_glycoct_anomer_pos <- function(content) {
 #' @noRd
 extract_glycoct_ring_bounds <- function(content) {
   stringr::str_extract(content, "-((?:\\d+|x):(?:\\d+|x))", group = 1)
+}
+
+#' Parse numeric GlycoCT ring bounds
+#'
+#' @param bounds A GlycoCT ring-bounds string.
+#'
+#' @return An integer vector of length two, or two missing integers.
+#' @noRd
+parse_glycoct_ring_bounds <- function(bounds) {
+  if (is.na(bounds) || stringr::str_detect(bounds, "x")) {
+    return(c(NA_integer_, NA_integer_))
+  }
+  as.integer(stringr::str_split_1(bounds, stringr::fixed(":")))
+}
+
+#' Check whether GlycoCT ring bounds describe a supported cyclic form
+#'
+#' @param bounds A GlycoCT ring-bounds string.
+#'
+#' @return A logical scalar.
+#' @noRd
+is_supported_glycoct_ring_bounds <- function(bounds) {
+  parsed <- parse_glycoct_ring_bounds(bounds)
+  !anyNA(parsed) && parsed[[2]] - parsed[[1]] %in% c(3L, 4L)
+}
+
+#' Check whether GlycoCT content describes a furanose ring
+#'
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A logical scalar.
+#' @noRd
+is_glycoct_furanose <- function(content) {
+  bounds <- parse_glycoct_ring_bounds(extract_glycoct_ring_bounds(content))
+  !anyNA(bounds) && identical(bounds[[2]] - bounds[[1]], 3L)
+}
+
+#' Preserve a GlycoCT furanose ring in a mapped monosaccharide
+#'
+#' @param mono A glyrepr monosaccharide name.
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A glyrepr monosaccharide name.
+#' @noRd
+preserve_glycoct_ring <- function(mono, content) {
+  if (is_glycoct_furanose(content)) {
+    return(as_furanose_monosaccharide(mono))
+  }
+  mono
 }
 
 #' Remove the ring-bounds component from a GlycoCT monosaccharide descriptor
@@ -261,7 +463,7 @@ parse_lin_section <- function(lin_lines) {
       to_res <- as.integer(matches[6])
       to_pos <- matches[5]
 
-      linkages[[link_id]] <- list(
+      linkages[[as.character(link_id)]] <- list(
         from_res = from_res,
         from_pos = from_pos,
         to_res = to_res,
@@ -274,11 +476,19 @@ parse_lin_section <- function(lin_lines) {
 }
 
 build_glycoct_graph <- function(residues, linkages) {
-  # Load monosaccharide mappings
-  mono_mappings <- load_mono_mappings()
+  build_glycoct_graph_data(residues, linkages)$graph
+}
+
+build_glycoct_graph_data <- function(residues, linkages) {
+  mono_mapping_index <- glycoct_mapping_index()
 
   # Consolidate monosaccharides with their substituents
-  consolidated <- consolidate_residues(residues, linkages, mono_mappings)
+  consolidated <- consolidate_residues(
+    residues,
+    linkages,
+    mono_mapping_index
+  )
+  consolidated <- normalize_glycoct_man_alditol_orientation(consolidated)
 
   # Build igraph
   if (length(consolidated$vertices) == 0) {
@@ -303,31 +513,15 @@ build_glycoct_graph <- function(residues, linkages) {
     if (length(from_idx) == 1 && length(to_idx) == 1) {
       edges <- c(edges, from_idx, to_idx)
 
-      # Build linkage string: anomer + to_pos + "-" + from_pos
       to_vertex <- consolidated$vertices[[to_idx]]
-
-      # Handle unknown anomer and positions
-      anomer_char <- if (to_vertex$anomer %in% c("x", "o")) {
-        "?"
-      } else {
-        to_vertex$anomer
-      }
-      to_pos_str <- if (edge$to_pos == "-1") "?" else as.character(edge$to_pos)
-      from_pos_str <- if (edge$from_pos == "-1") {
-        "?"
-      } else {
-        as.character(edge$from_pos)
-      }
-      if (stringr::str_detect(from_pos_str, stringr::fixed("|"))) {
-        from_pos_str <- stringr::str_replace_all(
-          from_pos_str,
-          stringr::fixed("|"),
-          stringr::fixed("/")
+      edge_attrs$linkage <- c(
+        edge_attrs$linkage,
+        format_glycoct_linkage(
+          edge$from_pos,
+          edge$to_pos,
+          to_vertex$anomer
         )
-      }
-
-      linkage_str <- paste0(anomer_char, to_pos_str, "-", from_pos_str)
-      edge_attrs$linkage <- c(edge_attrs$linkage, linkage_str)
+      )
     }
   }
 
@@ -361,9 +555,464 @@ build_glycoct_graph <- function(residues, linkages) {
   } else {
     g$anomer <- "?1"
   }
-  g$alditol <- FALSE
+  g$alditol <- !is.null(reducing_end) && isTRUE(reducing_end$is_alditol)
 
-  g
+  list(
+    graph = g,
+    original_ids = purrr::map_int(
+      consolidated$vertices,
+      "original_id"
+    ),
+    vertices = consolidated$vertices
+  )
+}
+
+#' Format a GlycoCT linkage as IUPAC-condensed linkage text
+#'
+#' @param parent_pos Acceptor position on the parent residue.
+#' @param child_pos Donor position on the child residue.
+#' @param child_anomer Anomer configuration of the child residue.
+#'
+#' @return A linkage string such as `"a2-3"` or `"?1-?"`.
+#' @noRd
+format_glycoct_linkage <- function(parent_pos, child_pos, child_anomer) {
+  anomer <- if (child_anomer %in% c("x", "o")) "?" else child_anomer
+  donor <- if (child_pos == "-1") "?" else child_pos
+  acceptor <- if (parent_pos == "-1") "?" else parent_pos
+  acceptor <- stringr::str_replace_all(
+    acceptor,
+    stringr::fixed("|"),
+    stringr::fixed("/")
+  )
+
+  paste0(anomer, donor, "-", acceptor)
+}
+
+#' Combine a main GlycoCT tree with parsed UND subtree graphs
+#'
+#' @param main Main-tree graph data.
+#' @param floating_graphs Graph data for each floating subtree.
+#' @param floating Parsed UND metadata.
+#' @param floating_substituents Parsed substituent-only UND metadata.
+#'
+#' @return An annotated glycan forest understood by `glyrepr`.
+#' @noRd
+build_glycoct_floating_graph <- function(
+  main,
+  floating_graphs,
+  floating,
+  floating_substituents = list()
+) {
+  graph_data <- c(list(main), floating_graphs)
+  sizes <- purrr::map_int(graph_data, ~ igraph::vcount(.x$graph))
+  offsets <- c(0L, utils::head(cumsum(sizes), -1L))
+
+  forest <- igraph::make_empty_graph(sum(sizes), directed = TRUE)
+  edge_endpoints <- purrr::map2(
+    graph_data,
+    offsets,
+    function(data, offset) {
+      endpoints <- igraph::as_edgelist(data$graph, names = FALSE)
+      if (length(endpoints) == 0) {
+        return(integer())
+      }
+      as.integer(t(endpoints + offset))
+    }
+  )
+  edge_endpoints <- unlist(edge_endpoints, use.names = FALSE)
+  edge_linkages <- unlist(
+    purrr::map(
+      graph_data,
+      ~ igraph::edge_attr(.x$graph, "linkage")
+    ),
+    use.names = FALSE
+  )
+  if (length(edge_endpoints) > 0) {
+    forest <- igraph::add_edges(
+      forest,
+      edge_endpoints,
+      linkage = edge_linkages
+    )
+  } else {
+    forest <- igraph::set_edge_attr(
+      forest,
+      "linkage",
+      value = character()
+    )
+  }
+
+  igraph::V(forest)$name <- as.character(seq_len(sum(sizes)))
+  igraph::V(forest)$mono <- unlist(
+    purrr::map(graph_data, ~ igraph::V(.x$graph)$mono),
+    use.names = FALSE
+  )
+  igraph::V(forest)$sub <- unlist(
+    purrr::map(graph_data, ~ igraph::V(.x$graph)$sub),
+    use.names = FALSE
+  )
+  forest$anomer <- main$graph$anomer
+  forest$alditol <- isTRUE(main$graph$alditol)
+  all_vertices <- seq_len(igraph::vcount(forest))
+
+  main_parent_indices <- stats::setNames(
+    seq_along(main$original_ids),
+    main$original_ids
+  )
+  occupied_slots <- definitely_occupied_acceptor_slots(
+    main$graph,
+    seq_along(main$original_ids)
+  )
+  occupied_carbon_slots <- definitely_occupied_carbon_slots(
+    main$graph,
+    seq_along(main$original_ids)
+  )
+  if (length(floating_graphs) > 0L) {
+    forest$floating_parts <- purrr::map2(
+      seq_along(floating_graphs),
+      floating,
+      function(part_id, metadata) {
+        data <- floating_graphs[[part_id]]
+        offset <- offsets[[part_id + 1L]]
+        root <- which(igraph::degree(data$graph, mode = "in") == 0)
+        parents <- map_glycoct_und_parents(
+          metadata$parent_ids,
+          main_parent_indices
+        )
+
+        linkage <- format_glycoct_linkage(
+          metadata$parent_pos,
+          metadata$child_pos,
+          data$vertices[[root]]$anomer
+        )
+        parents <- normalize_floating_part_parents(
+          parents,
+          setdiff(
+            all_vertices,
+            offset + seq_len(sizes[[part_id + 1L]])
+          ),
+          linkage,
+          occupied_slots,
+          context = "GlycoCT UND part"
+        )
+
+        list(
+          root = as.integer(offset + root),
+          nodes = as.integer(offset + seq_len(sizes[[part_id + 1L]])),
+          linkage = linkage,
+          parents = as.integer(parents)
+        )
+      }
+    )
+  }
+
+  if (length(floating_substituents) > 0L) {
+    forest$floating_substituents <- purrr::map(
+      floating_substituents,
+      function(metadata) {
+        parents <- map_glycoct_und_parents(
+          metadata$parent_ids,
+          main_parent_indices
+        )
+        positions <- stringr::str_split_1(
+          metadata$parent_pos,
+          stringr::fixed("|")
+        )
+        position <- collapse_floating_substituent_positions(positions)
+        substituent <- metadata$residues[[1]]$content
+        substituent <- paste0(
+          position,
+          glycoct_substituent_abbreviation(substituent)
+        )
+        domain <- normalize_floating_substituent_parents(
+          parents,
+          all_vertices,
+          substituent,
+          occupied_carbon_slots,
+          context = "GlycoCT UND substituent"
+        )
+
+        list(
+          substituent = domain$substituent,
+          parents = as.integer(domain$parents)
+        )
+      }
+    )
+  }
+
+  forest
+}
+
+#' Map GlycoCT UND parent IDs to main-tree graph indices
+#'
+#' @param parent_ids GlycoCT residue IDs declared by an UND block.
+#' @param main_parent_indices Named main-tree graph indices.
+#'
+#' @return Integer main-tree graph indices.
+#' @noRd
+map_glycoct_und_parents <- function(parent_ids, main_parent_indices) {
+  parents <- unname(main_parent_indices[as.character(parent_ids)])
+  if (anyNA(parents)) {
+    missing_ids <- parent_ids[is.na(parents)]
+    cli::cli_abort(c(
+      "GlycoCT UND candidate parents must be main-tree monosaccharides.",
+      "x" = "Can't find main-tree residue ID{?s} {.val {missing_ids}}."
+    ))
+  }
+  as.integer(parents)
+}
+
+#' Find definitely occupied acceptor slots in a glycan tree
+#'
+#' @param graph A parsed glycan graph.
+#' @param vertices Vertices belonging to the tree of interest.
+#'
+#' @return Character keys combining parent vertex and acceptor position.
+#' @noRd
+definitely_occupied_acceptor_slots <- function(
+  graph,
+  vertices = seq_len(igraph::vcount(graph))
+) {
+  if (igraph::ecount(graph) == 0) {
+    return(character())
+  }
+
+  endpoints <- igraph::as_edgelist(graph, names = FALSE)
+  linkages <- igraph::edge_attr(graph, "linkage")
+  positions <- purrr::map(linkages, linkage_acceptor_positions)
+  definite <- lengths(positions) == 1L &
+    endpoints[, 1] %in% vertices &
+    endpoints[, 2] %in% vertices
+
+  paste(
+    endpoints[definite, 1],
+    unlist(positions[definite], use.names = FALSE),
+    sep = "\r"
+  )
+}
+
+#' Extract possible acceptor positions from an IUPAC linkage
+#'
+#' @param linkage An IUPAC-condensed linkage.
+#'
+#' @return A character vector. Unknown positions return an empty vector.
+#' @noRd
+linkage_acceptor_positions <- function(linkage) {
+  acceptor <- stringr::str_extract(linkage, "(?<=-).*$")
+  if (is.na(acceptor) || acceptor == "?") {
+    return(character())
+  }
+
+  stringr::str_split(acceptor, stringr::fixed("/"))[[1]]
+}
+
+#' Find definitely occupied carbon slots in a glycan tree
+#'
+#' @param graph A parsed glycan graph.
+#' @param vertices Vertices belonging to the tree of interest.
+#'
+#' @return Character keys combining parent vertex and carbon position.
+#' @noRd
+definitely_occupied_carbon_slots <- function(
+  graph,
+  vertices = seq_len(igraph::vcount(graph))
+) {
+  edge_slots <- definitely_occupied_acceptor_slots(graph, vertices)
+  substituent_slots <- purrr::map(
+    vertices,
+    function(vertex) {
+      substituents <- igraph::vertex_attr(graph, "sub", index = vertex)
+      if (identical(substituents, "")) {
+        return(character())
+      }
+      tokens <- stringr::str_split_1(
+        substituents,
+        stringr::fixed(",")
+      )
+      positions <- purrr::map(
+        tokens,
+        floating_substituent_positions
+      )
+      definite <- lengths(positions) == 1L
+      paste(
+        vertex,
+        unlist(positions[definite], use.names = FALSE),
+        sep = "\r"
+      )
+    }
+  )
+
+  unique(c(
+    edge_slots,
+    unlist(substituent_slots, use.names = FALSE)
+  ))
+}
+
+#' Extract possible carbon positions from a substituent token
+#'
+#' @param substituent One substituent token.
+#'
+#' @return A character vector. Unknown positions return an empty vector.
+#' @noRd
+floating_substituent_positions <- function(substituent) {
+  position <- stringr::str_extract(substituent, "^[?0-9/]+")
+  if (
+    is.na(position) ||
+      stringr::str_detect(position, stringr::fixed("?"))
+  ) {
+    return(character())
+  }
+  stringr::str_split_1(position, stringr::fixed("/"))
+}
+
+#' Collapse source-format substituent positions into one glyrepr position
+#'
+#' @param positions Source-format carbon positions.
+#'
+#' @return A canonical position string.
+#' @noRd
+collapse_floating_substituent_positions <- function(positions) {
+  if (any(positions %in% c("?", "-1"))) {
+    return("?")
+  }
+  paste(sort(unique(as.integer(positions))), collapse = "/")
+}
+
+#' Normalize floating-substituent candidate parents
+#'
+#' @param parents Declared candidate vertex indices.
+#' @param implicit_parents Every vertex represented by an implicit domain.
+#' @param substituent A floating substituent token.
+#' @param occupied_slots Definitely occupied candidate carbon slots.
+#' @param context Input-format context for error messages.
+#'
+#' @return A list containing the normalized substituent and candidate parents.
+#'   An empty parent vector represents the complete implicit candidate set.
+#' @noRd
+normalize_floating_substituent_parents <- function(
+  parents,
+  implicit_parents,
+  substituent,
+  occupied_slots,
+  context
+) {
+  positions <- floating_substituent_positions(substituent)
+  if (length(positions) == 0L) {
+    if (setequal(parents, implicit_parents)) {
+      parents <- integer()
+    }
+    return(list(substituent = substituent, parents = parents))
+  }
+
+  feasible_positions <- purrr::map(parents, function(parent) {
+    slots <- paste(parent, positions, sep = "\r")
+    positions[!slots %in% occupied_slots]
+  })
+  feasible_parents <- lengths(feasible_positions) > 0L
+  parents <- parents[feasible_parents]
+  feasible_positions <- feasible_positions[feasible_parents]
+  if (length(parents) == 0L) {
+    cli::cli_abort(
+      "No feasible parent remains for a {context} after excluding occupied carbon positions.",
+      call = rlang::caller_env()
+    )
+  }
+
+  position_sets <- purrr::map(
+    feasible_positions,
+    ~ sort(unique(.x))
+  )
+  if (length(unique(position_sets)) != 1L) {
+    cli::cli_abort(
+      "Can't represent the feasible parent-position combinations for a {context} after excluding occupied carbon positions.",
+      call = rlang::caller_env()
+    )
+  }
+
+  position <- collapse_floating_substituent_positions(position_sets[[1]])
+  substituent <- stringr::str_replace(
+    substituent,
+    "^[?0-9/]+",
+    position
+  )
+  if (setequal(parents, implicit_parents)) {
+    parents <- integer()
+  }
+  list(substituent = substituent, parents = parents)
+}
+
+#' Normalize floating-part candidate parents
+#'
+#' @param parents Declared candidate vertex indices.
+#' @param implicit_parents Every vertex represented by an implicit domain.
+#' @param linkage The floating part's attachment linkage.
+#' @param occupied_slots Definitely occupied candidate acceptor slots.
+#' @param context Input-format context for error messages.
+#'
+#' @return An empty vector for the complete implicit candidate set, otherwise
+#'   the feasible explicit candidate parents.
+#' @noRd
+normalize_floating_part_parents <- function(
+  parents,
+  implicit_parents,
+  linkage,
+  occupied_slots,
+  context
+) {
+  if (setequal(parents, implicit_parents)) {
+    return(integer())
+  }
+
+  filter_floating_part_parents(
+    parents,
+    linkage,
+    occupied_slots,
+    context
+  )
+}
+
+#' Remove infeasible candidate parents from a floating part
+#'
+#' @param parents Declared main-tree candidate vertex indices.
+#' @param linkage The floating part's attachment linkage.
+#' @param occupied_slots Definitely occupied main-tree acceptor slots.
+#' @param context Input-format context for error messages.
+#'
+#' @return Feasible candidate parent indices.
+#' @noRd
+filter_floating_part_parents <- function(
+  parents,
+  linkage,
+  occupied_slots,
+  context
+) {
+  positions <- linkage_acceptor_positions(linkage)
+  if (length(positions) == 0) {
+    return(parents)
+  }
+
+  feasible <- purrr::map_lgl(parents, function(parent) {
+    slots <- paste(parent, positions, sep = "\r")
+    any(!slots %in% occupied_slots)
+  })
+  parents <- parents[feasible]
+  if (length(parents) == 0) {
+    cli::cli_abort(
+      "No feasible parent remains for a {context} after excluding occupied acceptor positions.",
+      call = rlang::caller_env()
+    )
+  }
+
+  parents
+}
+
+
+filter_glycoct_und_parents <- function(parents, linkage, occupied_slots) {
+  filter_floating_part_parents(
+    parents,
+    linkage,
+    occupied_slots,
+    context = "GlycoCT UND part"
+  )
 }
 
 #' Format the reducing-end anomer stored in a GlycoCT graph
@@ -386,10 +1035,46 @@ format_glycoct_reducing_anomer <- function(reducing_end) {
   if (is.null(anomer_pos) || is.na(anomer_pos)) {
     anomer_pos <- decide_anomer_pos(reducing_end$mono)
   } else if (anomer_pos == "x") {
-    anomer_pos <- "?"
+    anomer_pos <- if (
+      reducing_end$mono %in% glyrepr::available_monosaccharides("generic")
+    ) {
+      decide_anomer_pos(reducing_end$mono)
+    } else {
+      "?"
+    }
   }
 
   paste0(anomer_config, anomer_pos)
+}
+
+
+#' Add unusual configurations to GlycoCT monosaccharide mappings
+#'
+#' @param mappings Named GlycoCT monosaccharide mappings.
+#'
+#' @return The mappings with configuration-inverted counterparts.
+#' @noRd
+add_unusual_glycoct_mappings <- function(mappings) {
+  unusual_map <- unusual_configuration_monosaccharide_map()
+  natural <- names(mappings) %in% names(unusual_map)
+  unusual <- mappings[natural]
+
+  unusual <- purrr::map(unusual, function(mapping) {
+    mapping$res <- stringr::str_replace_all(
+      mapping$res,
+      "(?<=-)[dl](?=[a-z])",
+      \(configuration) invert_configuration(configuration)
+    )
+    mapping
+  })
+  names(unusual) <- unname(unusual_map[names(mappings)[natural]])
+  duplicates <- purrr::map_lgl(
+    unusual,
+    \(mapping) any(purrr::map_lgl(mappings, identical, mapping))
+  )
+  unusual <- unusual[!duplicates]
+
+  c(mappings, unusual)
 }
 
 load_mono_mappings <- function() {
@@ -525,6 +1210,10 @@ load_mono_mappings <- function() {
     ),
     "Fuc" = list(
       res = c("1b:a-lgal-HEX-1:5|6:d"),
+      lin = NULL
+    ),
+    "Fuc" = list(
+      res = c("1b:a-lxyl-HEX-1:5|4:d|6:d"),
       lin = NULL
     ),
     "Qui" = list(
@@ -701,7 +1390,7 @@ load_mono_mappings <- function() {
     )
   )
 
-  return(GLYCOCT_MAP)
+  add_unusual_glycoct_mappings(GLYCOCT_MAP)
 }
 
 #' Load GlycoCT alditol monosaccharide mappings
@@ -926,15 +1615,247 @@ load_alditol_mono_mappings <- function() {
     )
   )
 
-  return(GLYCOCT_ALDITOL_MAP)
+  add_unusual_glycoct_mappings(GLYCOCT_ALDITOL_MAP)
 }
 
-consolidate_residues <- function(residues, linkages, mono_mappings) {
-  has_alditol <- has_glycoct_alditol_residue(residues)
-  alditol_mappings <- if (has_alditol) {
-    load_alditol_mono_mappings()
+compile_glycoct_mapping <- function(name, mapping) {
+  mono_lines <- mapping$res[grepl("^\\d+b:", mapping$res)]
+  pattern_mono <- NULL
+  if (length(mono_lines) > 0) {
+    pattern_mono <- sub("^\\d+b:[abxo]-", "", mono_lines[[1]])
+  }
+
+  sub_lines <- mapping$res[grepl("^\\d+s:", mapping$res)]
+  pattern_subs <- sort(sub("^\\d+s:", "", sub_lines))
+
+  pattern_linkages <- character()
+  if (!is.null(mapping$lin)) {
+    linkage_matches <- regexec(
+      "\\d+:(\\d+)[do]?\\((\\d+)\\+(\\d+)\\)(\\d+)[dn]?",
+      mapping$lin
+    )
+    linkage_parts <- regmatches(mapping$lin, linkage_matches)
+    pattern_linkages <- sort(vapply(
+      linkage_parts,
+      function(parts) {
+        if (length(parts) == 0) {
+          return(NA_character_)
+        }
+        paste0(parts[[3]], "+", parts[[4]])
+      },
+      character(1)
+    ))
+    pattern_linkages <- pattern_linkages[!is.na(pattern_linkages)]
+  }
+
+  mapping_residues <- parse_res_section(mapping$res)
+  mapping_linkages <- parse_lin_section(
+    if (is.null(mapping$lin)) character() else mapping$lin
+  )
+  pattern_substituents <- glycoct_substituent_tokens(
+    as.integer(names(mapping_residues)),
+    mapping_residues,
+    mapping_linkages
+  )
+
+  c(
+    list(name = name),
+    glycoct_mono_signature(pattern_mono),
+    list(
+      subs = pattern_subs,
+      linkages = pattern_linkages,
+      substituents = sort(pattern_substituents),
+      single = length(mapping$res) == 1L
+    )
+  )
+}
+
+glycoct_mono_signature <- function(content) {
+  bounds <- extract_glycoct_ring_bounds(content)
+  list(
+    mono = content,
+    core = remove_glycoct_ring_bounds(content),
+    bounds = bounds,
+    wildcard_bounds = !is.na(bounds) && grepl("x", bounds, fixed = TRUE),
+    alditol = is_glycoct_alditol_mono(content)
+  )
+}
+
+glycoct_signature_mono_matches <- function(signature, entry) {
+  if (!identical(signature$alditol, entry$alditol)) {
+    return(FALSE)
+  }
+  if (is.na(signature$bounds) || is.na(entry$bounds)) {
+    return(identical(signature$bounds, entry$bounds))
+  }
+  same_ring_family <- is_supported_glycoct_ring_bounds(signature$bounds) &&
+    is_supported_glycoct_ring_bounds(entry$bounds) &&
+    parse_glycoct_ring_bounds(signature$bounds)[[1]] ==
+      parse_glycoct_ring_bounds(entry$bounds)[[1]]
+  identical(signature$bounds, entry$bounds) ||
+    signature$wildcard_bounds ||
+    entry$wildcard_bounds ||
+    same_ring_family
+}
+
+glycoct_signature_key <- function(core, substituents) {
+  paste(
+    core,
+    paste(substituents, collapse = "\r"),
+    sep = "\n"
+  )
+}
+
+glycoct_signature_substituents <- function(signature) {
+  if (!is.null(signature$substituents)) {
+    return(signature$substituents)
+  }
+  if (length(signature$subs) != length(signature$linkages)) {
+    return(character())
+  }
+  purrr::map2_chr(signature$subs, signature$linkages, function(sub, linkage) {
+    positions <- stringr::str_split_1(linkage, stringr::fixed("+"))
+    paste(sub, positions[[1]], positions[[2]], sep = "\r")
+  })
+}
+
+compile_glycoct_mapping_index <- function(mappings) {
+  entries <- Map(
+    compile_glycoct_mapping,
+    names(mappings),
+    unname(mappings)
+  )
+  cores <- vapply(entries, `[[`, character(1), "core")
+  keys <- vapply(
+    entries,
+    function(entry) {
+      glycoct_signature_key(
+        entry$core,
+        entry$substituents
+      )
+    },
+    character(1)
+  )
+
+  list(
+    entries = entries,
+    exact = split(seq_along(entries), keys),
+    by_core = split(seq_along(entries), cores)
+  )
+}
+
+glycoct_mapping_index <- local({
+  regular <- NULL
+  alditol_index <- NULL
+
+  function(alditol = FALSE) {
+    if (alditol) {
+      if (is.null(alditol_index)) {
+        alditol_index <<- compile_glycoct_mapping_index(
+          load_alditol_mono_mappings()
+        )
+      }
+      return(alditol_index)
+    }
+
+    if (is.null(regular)) {
+      regular <<- compile_glycoct_mapping_index(load_mono_mappings())
+    }
+    regular
+  }
+})
+
+glycoct_group_signature <- function(group, residues, linkages) {
+  group_mono <- NULL
+  group_subs <- character()
+  group_linkages <- character()
+
+  for (id in group) {
+    res <- residues[[as.character(id)]]
+    if (is.null(res)) {
+      next
+    }
+    if (res$type == "mono") {
+      group_mono <- res$content
+    } else if (res$type == "sub") {
+      group_subs <- c(group_subs, res$content)
+    }
+  }
+
+  for (linkage in linkages) {
+    if (!(linkage$from_res %in% group && linkage$to_res %in% group)) {
+      next
+    }
+    from_res <- residues[[as.character(linkage$from_res)]]
+    to_res <- residues[[as.character(linkage$to_res)]]
+    if (
+      !is.null(from_res) &&
+        !is.null(to_res) &&
+        from_res$type == "mono" &&
+        to_res$type == "sub"
+    ) {
+      group_linkages <- c(
+        group_linkages,
+        paste0(linkage$from_pos, "+", linkage$to_pos)
+      )
+    }
+  }
+
+  mono_signature <- if (is.null(group_mono)) {
+    list(
+      mono = NULL,
+      core = NULL,
+      bounds = NA_character_,
+      wildcard_bounds = FALSE,
+      alditol = FALSE
+    )
   } else {
-    list()
+    glycoct_mono_signature(group_mono)
+  }
+
+  c(
+    mono_signature,
+    list(
+      subs = sort(group_subs),
+      linkages = sort(group_linkages),
+      substituents = sort(glycoct_substituent_tokens(
+        group,
+        residues,
+        linkages
+      ))
+    )
+  )
+}
+
+glycoct_substituent_tokens <- function(group, residues, linkages) {
+  tokens <- character()
+  for (linkage in linkages) {
+    from_res <- residues[[as.character(linkage$from_res)]]
+    to_res <- residues[[as.character(linkage$to_res)]]
+    if (
+      linkage$from_res %in%
+        group &&
+        linkage$to_res %in% group &&
+        !is.null(from_res) &&
+        !is.null(to_res) &&
+        identical(from_res$type, "mono") &&
+        identical(to_res$type, "sub")
+    ) {
+      tokens <- c(
+        tokens,
+        paste(to_res$content, linkage$from_pos, linkage$to_pos, sep = "\r")
+      )
+    }
+  }
+  tokens
+}
+
+consolidate_residues <- function(residues, linkages, mono_mapping_index) {
+  has_alditol <- has_glycoct_alditol_residue(residues)
+  alditol_mapping_index <- if (has_alditol) {
+    glycoct_mapping_index(alditol = TRUE)
+  } else {
+    NULL
   }
 
   # Group residues by their linkage relationships to identify composite structures
@@ -962,19 +1883,21 @@ consolidate_residues <- function(residues, linkages, mono_mappings) {
         )
       }
     } else {
-      # Composite structure - try to match with known patterns
-      matched <- match_composite_structure(
+      group_signature <- glycoct_group_signature(
         group,
         residues,
-        linkages,
-        alditol_mappings
+        linkages
+      )
+
+      # Composite structure - try to match with known patterns
+      matched <- match_composite_structure(
+        group_signature,
+        alditol_mapping_index
       )
       if (is.null(matched)) {
         matched <- match_composite_structure(
-          group,
-          residues,
-          linkages,
-          mono_mappings
+          group_signature,
+          mono_mapping_index
         )
       }
 
@@ -997,7 +1920,7 @@ consolidate_residues <- function(residues, linkages, mono_mappings) {
             vertices,
             list(list(
               original_id = main_mono_id,
-              mono = matched,
+              mono = preserve_glycoct_ring(matched, main_mono$content),
               sub = "",
               anomer = main_mono$anomer,
               anomer_pos = main_mono$anomer_pos,
@@ -1006,22 +1929,26 @@ consolidate_residues <- function(residues, linkages, mono_mappings) {
           )
         } else {
           # No exact match - try partial matching with extra substituents
-          partial_mappings <- if (isTRUE(main_mono$is_alditol)) {
-            alditol_mappings
+          partial_mapping_index <- if (isTRUE(main_mono$is_alditol)) {
+            alditol_mapping_index
           } else {
-            mono_mappings
+            mono_mapping_index
           }
           partial_result <- match_partial_composite_structure(
             group,
             residues,
             linkages,
-            partial_mappings
+            group_signature,
+            partial_mapping_index
           )
           vertices <- append(
             vertices,
             list(list(
               original_id = main_mono_id,
-              mono = partial_result$mono,
+              mono = preserve_glycoct_ring(
+                partial_result$mono,
+                main_mono$content
+              ),
               sub = partial_result$sub,
               anomer = main_mono$anomer,
               anomer_pos = main_mono$anomer_pos,
@@ -1082,28 +2009,38 @@ find_composite_groups <- function(residues, linkages) {
 }
 
 match_composite_structure <- function(
-  group,
-  residues,
-  linkages,
-  mono_mappings
+  group_signature,
+  mapping_index
 ) {
-  # Try to match the composite structure with known monosaccharides
-  for (idx in seq_along(mono_mappings)) {
-    mono_name <- names(mono_mappings)[[idx]]
-    mapping <- mono_mappings[[idx]]
-    if (matches_glycoct_pattern(group, residues, linkages, mapping)) {
-      return(mono_name)
+  if (is.null(mapping_index) || is.null(group_signature$core)) {
+    return(NULL)
+  }
+
+  key <- glycoct_signature_key(
+    group_signature$core,
+    glycoct_signature_substituents(group_signature)
+  )
+  candidates <- mapping_index$exact[[key]]
+  if (is.null(candidates)) {
+    return(NULL)
+  }
+
+  for (idx in candidates) {
+    entry <- mapping_index$entries[[idx]]
+    if (glycoct_signature_mono_matches(group_signature, entry)) {
+      return(entry$name)
     }
   }
 
-  return(NULL)
+  NULL
 }
 
 match_partial_composite_structure <- function(
   group,
   residues,
   linkages,
-  mono_mappings
+  group_signature,
+  mapping_index
 ) {
   generic_result <- match_generic_glycoct_composite(group, residues, linkages)
   if (!is.null(generic_result)) {
@@ -1112,76 +2049,51 @@ match_partial_composite_structure <- function(
 
   # Try to find the best partial match and identify extra substituents
   best_match <- NULL
-  best_extra_subs <- c()
+  best_extra_substituents <- character()
+  group_substituents <- group_signature$substituents
+  group_subs <- group_signature$subs
+  group_mono <- group_signature$mono
 
-  # Get all substituents in this group
-  group_subs <- c()
-  group_mono <- NULL
-
-  for (id in group) {
-    res <- residues[[as.character(id)]]
-    if (!is.null(res)) {
-      if (res$type == "mono") {
-        group_mono <- res
-      } else if (res$type == "sub") {
-        group_subs <- c(group_subs, res$content)
-      }
-    }
+  candidate_indices <- if (
+    is.null(mapping_index) || is.null(group_signature$core)
+  ) {
+    integer()
+  } else {
+    mapping_index$by_core[[group_signature$core]]
   }
 
   # Try to find a known composite that uses a subset of our substituents
-  for (idx in seq_along(mono_mappings)) {
-    mono_name <- names(mono_mappings)[[idx]]
-    mapping <- mono_mappings[[idx]]
-
-    # Get the pattern's substituents
-    pattern_subs <- c()
-    for (res_line in mapping$res) {
-      if (stringr::str_detect(res_line, "^\\d+s:")) {
-        sub_content <- stringr::str_remove(res_line, "^\\d+s:")
-        pattern_subs <- c(pattern_subs, sub_content)
-      }
-    }
+  for (idx in candidate_indices) {
+    entry <- mapping_index$entries[[idx]]
+    pattern_substituents <- entry$substituents
 
     # Check if pattern substituents are a subset of group substituents
-    if (length(pattern_subs) > 0 && all(pattern_subs %in% group_subs)) {
-      # Get the pattern's monosaccharide
-      mono_lines <- mapping$res[stringr::str_detect(mapping$res, "^\\d+b:")]
-      if (length(mono_lines) > 0) {
-        pattern_mono_content <- stringr::str_remove(
-          mono_lines[1],
-          "^\\d+b:[abxo]-"
-        )
+    extra_substituents <- glycoct_multiset_difference(
+      group_substituents,
+      pattern_substituents
+    )
+    if (length(pattern_substituents) > 0 && !is.null(extra_substituents)) {
+      if (
+        !is.null(group_mono) &&
+          glycoct_signature_mono_matches(group_signature, entry)
+      ) {
+        exact_match <- length(extra_substituents) == 0L
+        if (exact_match) {
+          next
+        }
 
-        # Check if monosaccharide matches
-        if (
-          !is.null(group_mono) &&
-            glycoct_mono_content_matches(
-              group_mono$content,
-              pattern_mono_content
+        # For partial matching, only consider if there are extra substituents
+        if (length(pattern_substituents) < length(group_substituents)) {
+          if (
+            is.null(best_match) ||
+              length(pattern_substituents) >
+                length(best_match$pattern_substituents)
+          ) {
+            best_match <- list(
+              mono_name = entry$name,
+              pattern_substituents = pattern_substituents
             )
-        ) {
-          # Verify that the pattern substituents actually match with correct linkages
-          # by using the full pattern matching function
-          if (matches_glycoct_pattern(group, residues, linkages, mapping)) {
-            # Exact match - shouldn't be in partial matching function
-            next
-          }
-
-          # For partial matching, only consider if there are extra substituents
-          if (length(pattern_subs) < length(group_subs)) {
-            extra_subs <- setdiff(group_subs, pattern_subs)
-
-            if (
-              is.null(best_match) ||
-                length(pattern_subs) > length(best_match$pattern_subs)
-            ) {
-              best_match <- list(
-                mono_name = mono_name,
-                pattern_subs = pattern_subs
-              )
-              best_extra_subs <- extra_subs
-            }
+            best_extra_substituents <- extra_substituents
           }
         }
       }
@@ -1190,11 +2102,8 @@ match_partial_composite_structure <- function(
 
   if (!is.null(best_match)) {
     # Format extra substituents with position information
-    formatted_extra_subs <- format_extra_substituents(
-      best_extra_subs,
-      group,
-      residues,
-      linkages
+    formatted_extra_subs <- format_glycoct_substituent_tokens(
+      best_extra_substituents
     )
 
     return(list(
@@ -1204,7 +2113,7 @@ match_partial_composite_structure <- function(
   } else {
     # No partial match found, return base monosaccharide with all substituents
     if (!is.null(group_mono)) {
-      base_mono <- map_single_mono(group_mono$content)
+      base_mono <- map_single_mono(group_mono)
       formatted_subs <- format_extra_substituents(
         group_subs,
         group,
@@ -1219,6 +2128,49 @@ match_partial_composite_structure <- function(
   }
 
   return(list(mono = "Unk", sub = ""))
+}
+
+glycoct_multiset_difference <- function(x, y) {
+  remaining <- x
+  for (value in y) {
+    index <- match(value, remaining)
+    if (is.na(index)) {
+      return(NULL)
+    }
+    remaining <- remaining[-index]
+  }
+  remaining
+}
+
+format_glycoct_substituent_tokens <- function(tokens) {
+  if (length(tokens) == 0L) {
+    return("")
+  }
+  formatted <- purrr::map_chr(tokens, function(token) {
+    parts <- stringr::str_split_1(token, stringr::fixed("\r"))
+    position <- parts[[2]]
+    if (position == "-1") {
+      position <- "?"
+    }
+    position <- stringr::str_replace_all(position, "\\|", "/")
+    paste0(position, glycoct_substituent_abbreviation(parts[[1]]))
+  })
+  formatted <- sort_glycoct_substituents(formatted)
+  paste(formatted, collapse = ",")
+}
+
+sort_glycoct_substituents <- function(substituents) {
+  if (length(substituents) == 0L) {
+    return(character())
+  }
+  positions <- stringr::str_extract(substituents, "^[?0-9/]+")
+  first_position <- purrr::map_dbl(positions, function(position) {
+    if (is.na(position) || position == "?") {
+      return(Inf)
+    }
+    min(as.numeric(stringr::str_split_1(position, stringr::fixed("/"))))
+  })
+  substituents[order(first_position, substituents)]
 }
 
 #' Match generic GlycoCT monosaccharide composites
@@ -1267,6 +2219,30 @@ match_generic_glycoct_composite <- function(group, residues, linkages) {
       sub <- paste(c("2S", extra_sub[extra_sub != ""]), collapse = ",")
       return(list(mono = amino_mono, sub = sub))
     }
+  }
+
+  if (
+    is_generic_glycoct_hex(group_mono$content) &&
+      !is_generic_glycoct_dhex(group_mono$content) &&
+      "amino" %in% group_subs &&
+      has_glycoct_substituent_at(group, residues, linkages, "amino", "2")
+  ) {
+    substituent_tokens <- glycoct_substituent_tokens(
+      group,
+      residues,
+      linkages
+    )
+    identity_index <- purrr::detect_index(
+      substituent_tokens,
+      function(token) {
+        parts <- stringr::str_split_1(token, stringr::fixed("\r"))
+        identical(parts[[1]], "amino") && identical(parts[[2]], "2")
+      }
+    )
+    extra_sub <- format_glycoct_substituent_tokens(
+      substituent_tokens[-identity_index]
+    )
+    return(list(mono = "HexN", sub = extra_sub))
   }
 
   if (
@@ -1415,13 +2391,14 @@ has_glycoct_substituent_at <- function(
 format_extra_substituents <- function(extra_subs, group, residues, linkages) {
   # Format substituents with position information (e.g., "6S" for sulfate at position 6)
   formatted <- c()
+  used_substituents <- integer()
 
   for (sub_content in extra_subs) {
     # Find the position of this substituent
     position <- "?"
 
     for (linkage in linkages) {
-      if (linkage$to_res %in% group) {
+      if (linkage$to_res %in% group && !linkage$to_res %in% used_substituents) {
         to_res <- residues[[as.character(linkage$to_res)]]
         if (
           !is.null(to_res) &&
@@ -1429,6 +2406,7 @@ format_extra_substituents <- function(extra_subs, group, residues, linkages) {
             to_res$content == sub_content
         ) {
           position <- as.character(linkage$from_pos)
+          used_substituents <- c(used_substituents, linkage$to_res)
           break
         }
       }
@@ -1438,32 +2416,34 @@ format_extra_substituents <- function(extra_subs, group, residues, linkages) {
     if (position == "-1") {
       position <- "?"
     }
+    position <- stringr::str_replace_all(position, "\\|", "/")
 
     # Format the substituent with position
-    if (sub_content == "sulfate") {
-      formatted <- c(formatted, paste0(position, "S"))
-    } else if (sub_content == "n-acetyl") {
-      formatted <- c(formatted, paste0(position, "Ac"))
-    } else if (sub_content == "acetyl") {
-      formatted <- c(formatted, paste0(position, "Ac"))
-    } else if (sub_content == "methyl") {
-      formatted <- c(formatted, paste0(position, "Me"))
-    } else if (sub_content == "amino") {
-      formatted <- c(formatted, paste0(position, "N"))
-    } else if (sub_content == "phosphate") {
-      formatted <- c(formatted, paste0(position, "P"))
-    } else if (sub_content == "phospho-ethanolamine") {
-      formatted <- c(formatted, paste0(position, "PEtn"))
-    } else if (sub_content == "diphospho-ethanolamine") {
-      formatted <- c(formatted, paste0(position, "PPEtn"))
-    } else {
-      # Generic format - for unknown substituents, use the raw name
-      formatted <- c(formatted, paste0(position, sub_content))
-    }
+    formatted <- c(
+      formatted,
+      paste0(position, glycoct_substituent_abbreviation(sub_content))
+    )
   }
 
   # Join multiple substituents
+  formatted <- sort_glycoct_substituents(formatted)
   paste(formatted, collapse = ",")
+}
+
+glycoct_substituent_abbreviation <- function(x) {
+  switch(
+    x,
+    sulfate = "S",
+    `n-acetyl` = "NAc",
+    `n-glycolyl` = "NGc",
+    acetyl = "Ac",
+    methyl = "Me",
+    amino = "N",
+    phosphate = "P",
+    `phospho-ethanolamine` = "PEtn",
+    `diphospho-ethanolamine` = "PPEtn",
+    x
+  )
 }
 
 matches_glycoct_pattern <- function(group, residues, linkages, mapping) {
@@ -1551,25 +2531,33 @@ matches_glycoct_pattern <- function(group, residues, linkages, mapping) {
 }
 
 map_single_mono <- function(content) {
+  preserve_glycoct_ring(map_single_mono_ringless(content), content)
+}
+
+map_single_mono_ringless <- function(content) {
   # Extract monosaccharide name from content like "dglc-HEX-1:5" or "lgal-HEX-1:5|6:d"
 
   is_alditol <- is_glycoct_alditol_mono(content)
-  mono_mappings <- if (is_alditol) {
-    load_alditol_mono_mappings()
-  } else {
-    load_mono_mappings()
+  if (
+    identical(extract_glycoct_ring_bounds(content), "0:0") &&
+      !is_alditol
+  ) {
+    cli::cli_abort(
+      "Open-chain GlycoCT residues without an alditol modification are not representable."
+    )
   }
-  for (idx in seq_along(mono_mappings)) {
-    mono_name <- names(mono_mappings)[[idx]]
-    mapping <- mono_mappings[[idx]]
-    if (length(mapping$res) == 1) {
-      # Single monosaccharide without substituents
-      mono_line <- mapping$res[[1]]
-      if (stringr::str_detect(mono_line, "^\\d+b:")) {
-        pattern_content <- stringr::str_remove(mono_line, "^\\d+b:[abxo]-")
-        if (glycoct_mono_content_matches(content, pattern_content)) {
-          return(mono_name)
-        }
+  mapping_index <- glycoct_mapping_index(alditol = is_alditol)
+  mono_signature <- glycoct_mono_signature(content)
+  candidates <- mapping_index$by_core[[mono_signature$core]]
+  if (!is.null(candidates)) {
+    for (idx in candidates) {
+      entry <- mapping_index$entries[[idx]]
+      if (
+        entry$single &&
+          length(entry$subs) == 0L &&
+          glycoct_signature_mono_matches(mono_signature, entry)
+      ) {
+        return(entry$name)
       }
     }
   }
@@ -1580,8 +2568,14 @@ map_single_mono <- function(content) {
   if (is_generic_glycoct_dhex(content)) {
     return("dHex")
   }
+  if (is_generic_glycoct_hexa(content)) {
+    return("HexA")
+  }
   if (is_generic_glycoct_hex(content)) {
     return("Hex")
+  }
+  if (is_generic_glycoct_pen(content)) {
+    return("Pen")
   }
 
   # If no exact match, fall back to basic parsing
@@ -1649,6 +2643,19 @@ is_generic_glycoct_hex <- function(content) {
   ))
 }
 
+#' Check whether a GlycoCT content string is a generic pentose
+#'
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A logical scalar.
+#' @noRd
+is_generic_glycoct_pen <- function(content) {
+  isTRUE(stringr::str_detect(
+    content,
+    "^PEN-(?:\\d+|x):(?:\\d+|x)$"
+  ))
+}
+
 #' Check whether a GlycoCT content string is a generic deoxyhexose
 #'
 #' @param content GlycoCT monosaccharide content without the leading anomer.
@@ -1659,6 +2666,19 @@ is_generic_glycoct_dhex <- function(content) {
   isTRUE(stringr::str_detect(
     content,
     "^HEX-(?:\\d+|x):(?:\\d+|x)\\|6:d$"
+  ))
+}
+
+#' Check whether a GlycoCT content string is a generic hexuronic acid
+#'
+#' @param content GlycoCT monosaccharide content without the leading anomer.
+#'
+#' @return A logical scalar.
+#' @noRd
+is_generic_glycoct_hexa <- function(content) {
+  isTRUE(stringr::str_detect(
+    content,
+    "^HEX-(?:\\d+|x):(?:\\d+|x)\\|6:a$"
   ))
 }
 
@@ -1679,6 +2699,81 @@ find_group_containing <- function(groups, res_id) {
     }
   }
   return(NULL)
+}
+
+#' Normalize the attachment orientation of a symmetric Man alditol
+#'
+#' GlycoCT can number an unsubstituted Man alditol from either end. Prefer the
+#' orientation with the lexicographically larger decreasing attachment
+#' positions, matching the canonical orientation used by paired WURCS and GWB
+#' records.
+#'
+#' @param consolidated Consolidated GlycoCT vertices and edges.
+#'
+#' @return Consolidated graph data with reducing-end attachment positions
+#'   normalized.
+#' @noRd
+normalize_glycoct_man_alditol_orientation <- function(consolidated) {
+  reducing_end <- find_reducing_end(
+    consolidated$vertices,
+    consolidated$edges
+  )
+  if (
+    is.null(reducing_end) ||
+      !isTRUE(reducing_end$is_alditol) ||
+      !identical(reducing_end$mono, "Man") ||
+      !identical(reducing_end$sub, "")
+  ) {
+    return(consolidated)
+  }
+
+  root_edges <- purrr::map_lgl(
+    consolidated$edges,
+    ~ identical(.x$from_res, reducing_end$original_id)
+  )
+  if (!any(root_edges)) {
+    return(consolidated)
+  }
+
+  positions <- purrr::map(
+    consolidated$edges[root_edges],
+    ~ stringr::str_split_1(.x$from_pos, stringr::fixed("|"))
+  )
+  positions <- as.integer(unlist(positions, use.names = FALSE))
+  explicit <- positions >= 1L & positions <= 6L
+  if (anyNA(positions) || !any(explicit)) {
+    return(consolidated)
+  }
+
+  original_order <- sort(positions[explicit], decreasing = TRUE)
+  reflected_order <- sort(7L - positions[explicit], decreasing = TRUE)
+  differences <- which(original_order != reflected_order)
+  if (length(differences) == 0L) {
+    return(consolidated)
+  }
+  first_difference <- differences[[1]]
+  if (
+    reflected_order[[first_difference]] < original_order[[first_difference]]
+  ) {
+    return(consolidated)
+  }
+
+  consolidated$edges[root_edges] <- purrr::map(
+    consolidated$edges[root_edges],
+    function(edge) {
+      edge_positions <- stringr::str_split_1(
+        edge$from_pos,
+        stringr::fixed("|")
+      )
+      reflect <- edge_positions %in% as.character(1:6)
+      edge_positions[reflect] <- as.character(
+        7L - as.integer(edge_positions[reflect])
+      )
+      edge$from_pos <- paste(edge_positions, collapse = "|")
+      edge
+    }
+  )
+  consolidated
 }
 
 find_reducing_end <- function(vertices, edges) {

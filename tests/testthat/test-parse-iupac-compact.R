@@ -41,6 +41,28 @@ test_that("IUPAC-compact preserves NA and name semantics", {
   )
 })
 
+test_that("IUPAC-compact vectorizes terminal anomer positions", {
+  expect_identical(
+    iupac_compact_default_anomer_pos(c("Glc", "Neu5Ac", "Hex")),
+    c("1", "2", "1")
+  )
+
+  parsed <- parse_iupac_compact(c("Glcb", "Neu5Aca"))
+  expect_identical(as.character(parsed), c("Glc(b1-", "Neu5Ac(a2-"))
+})
+
+test_that("IUPAC-compact parses every furanose monosaccharide", {
+  furanose <- unname(furanose_monosaccharide_map())
+  anomer_pos <- glyrepr::get_anomer_pos(furanose)
+
+  parsed <- parse_iupac_compact(furanose)
+
+  expect_identical(
+    as.character(parsed),
+    paste0(furanose, "(?", anomer_pos, "-")
+  )
+})
+
 test_that("IUPAC-compact supports on_failure handling", {
   skip_on_old_win()
 
@@ -80,23 +102,22 @@ test_that("IUPAC-compact converts corpus modifier notation", {
   )
 })
 
-test_that("IUPAC-compact warns and parses alditols as regular reducing ends", {
+test_that("IUPAC-compact preserves alditols", {
   skip_on_old_win()
 
   simple_alditol <- "Fuca1-3(Galb1-4)Glc+aldi"
-  expect_warning(
-    simple_structure <- parse_iupac_compact(simple_alditol),
-    "regular reducing-end glycans with unknown anomer configurations"
+  simple_structure <- parse_iupac_compact(simple_alditol)
+  expect_equal(
+    as.character(simple_structure),
+    "Fuc(a1-3)[Gal(b1-4)]Glc-ol(?1-"
   )
-  expect_equal(as.character(simple_structure), "Fuc(a1-3)[Gal(b1-4)]Glc(?1-")
+  expect_identical(unname(glyrepr::get_alditol(simple_structure)), TRUE)
 
   linked_alditol <- "Galb1-3(Gal?1-?GlcNAcb1-3Galb1-4GlcNAcb1-6)GalNAc+aldi"
-  expect_warning(
-    linked_structure <- parse_iupac_compact(linked_alditol),
-    "regular reducing-end glycans with unknown anomer configurations"
-  )
+  linked_structure <- parse_iupac_compact(linked_alditol)
   expect_equal(
     as.character(linked_structure),
-    "Gal(?1-?)GlcNAc(b1-3)Gal(b1-4)GlcNAc(b1-6)[Gal(b1-3)]GalNAc(?1-"
+    "Gal(?1-?)GlcNAc(b1-3)Gal(b1-4)GlcNAc(b1-6)[Gal(b1-3)]GalNAc-ol(?1-"
   )
+  expect_identical(unname(glyrepr::get_alditol(linked_structure)), TRUE)
 })

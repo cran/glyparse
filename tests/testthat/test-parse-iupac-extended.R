@@ -16,6 +16,46 @@ test_that("monosaccharides are parsed correctly", {
   expect_mono("D-gro-α-D-manHepp-(1→", "DDmanHep")
 })
 
+test_that("every furanose monosaccharide is parsed correctly", {
+  furanose <- unname(furanose_monosaccharide_map())
+  unusual_map <- unusual_configuration_monosaccharide_map()
+  unusual_index <- match(furanose, unname(unusual_map))
+  natural <- furanose
+  natural[!is.na(unusual_index)] <- names(unusual_map)[
+    unusual_index[!is.na(unusual_index)]
+  ]
+  unusual <- unname(unusual_map[natural])
+  configuration <- invert_configuration(stringr::str_sub(unusual, 1, 1))
+  configuration[!is.na(unusual_index)] <- stringr::str_sub(
+    furanose[!is.na(unusual_index)],
+    1,
+    1
+  )
+  configuration[is.na(configuration)] <- "?"
+  extended <- names(IUPAC_EXT_TO_CON)[match(natural, IUPAC_EXT_TO_CON)]
+  anomer_pos <- glyrepr::get_anomer_pos(furanose)
+  input <- paste0("?-", configuration, "-", extended, "-(", anomer_pos, "→")
+
+  parsed <- parse_iupac_extended(input)
+  graphs <- glyrepr::get_structure_graphs(parsed, return_list = TRUE)
+
+  expect_identical(purrr::map_chr(graphs, ~ igraph::V(.x)$mono), furanose)
+})
+
+
+test_that("IUPAC-extended preserves unusual configurations", {
+  parsed <- parse_iupac_extended(c(
+    "α-L-Gulp-(1→",
+    "β-D-Fucp3S-(1→",
+    "?-D-Fucf-(1→"
+  ))
+
+  expect_identical(
+    as.character(parsed),
+    c("L-Gul(a1-", "D-Fuc3S(b1-", "D-Fucf(?1-")
+  )
+})
+
 
 test_that("plain text format is parsed correctly", {
   expect_mono <- function(iupac_ext, mono) {
@@ -62,6 +102,16 @@ test_that("generic monosaccharides are parsed correctly", {
 })
 
 
+test_that("abbreviated generic reducing ends are parsed correctly", {
+  parsed <- parse_iupac_extended(c("?-Hex", "?-HexNAc", "?-HexN"))
+
+  expect_identical(
+    as.character(parsed),
+    c("Hex(?1-", "HexNAc(?1-", "HexN(?1-")
+  )
+})
+
+
 test_that("substituents are parsed correctly", {
   expect_mono_and_sub <- function(iupac_ext, mono, sub) {
     structure <- parse_iupac_extended(iupac_ext)
@@ -100,6 +150,7 @@ test_that("linkages are parsed correctly", {
   expect_linkage("?-D-Galp-(1→4)-β-D-Galp-(1→", "?1-4")
   expect_linkage("α-D-Galp-(1→?)-β-D-Galp-(1→", "a1-?")
   expect_linkage("α-D-Galp-(1→3/4)-β-D-Galp-(1→", "a1-3/4")
+  expect_linkage("α-D-Galp-(1→4/?)-β-D-Galp-(1→", "a1-?")
 })
 
 

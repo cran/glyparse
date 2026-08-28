@@ -18,6 +18,7 @@
 #' 10. StrucGP
 #' 11. KCF
 #' 12. LINUCS
+#' 13. GlycoWorkbench
 #'
 #' @param x A character vector of structure strings. NA values are allowed and will be returned as NA structures.
 #' @param on_failure How to handle parsing failures. `"error"` aborts when a
@@ -39,7 +40,11 @@
 #' auto_parse(x)
 #'
 #' @export
-auto_parse <- function(x, on_failure = "error", progress = FALSE) {
+auto_parse <- function(
+  x,
+  on_failure = "error",
+  progress = FALSE
+) {
   struc_parser_wrapper(
     x,
     do_auto_parse,
@@ -54,7 +59,9 @@ do_auto_parse <- function(x) {
 }
 
 choose_parser <- function(x) {
-  if (stringr::str_detect(x, "ENTRY")) {
+  if (stringr::str_starts(x, "freeEnd|redEnd")) {
+    return(do_parse_gwb)
+  } else if (stringr::str_detect(x, "ENTRY")) {
     return(do_parse_kcf)
   } else if (stringr::str_detect(x, "RES")) {
     return(do_parse_glycoct)
@@ -66,6 +73,8 @@ choose_parser <- function(x) {
     return(do_parse_strucgp_struc)
   } else if (stringr::str_ends(x, "-OH")) {
     return(do_parse_glycam_iupac)
+  } else if (stringr::str_ends(x, stringr::fixed("-ol"))) {
+    return(do_parse_iupac_condensed)
   } else if (
     stringr::str_detect(x, "\\u2192") || # Unicode arrow →
       stringr::str_detect(x, "->") || # Plain text arrow ->

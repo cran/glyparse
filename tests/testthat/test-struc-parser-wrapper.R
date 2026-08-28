@@ -18,3 +18,61 @@ test_that("struc_parser_wrapper returns glyrepr-compatible vectors", {
     NA
   )
 })
+
+test_that("struc_parser_wrapper treats invalid parsed graphs as failures", {
+  parser <- function(x) {
+    graph <- igraph::make_empty_graph(n = 1, directed = TRUE)
+    igraph::V(graph)$name <- "1"
+    igraph::V(graph)$mono <- "Hex"
+    igraph::V(graph)$sub <- ""
+    igraph::E(graph)$linkage <- character()
+    graph$anomer <- "??"
+
+    if (x == "invalid") {
+      graph <- igraph::as_undirected(graph)
+    }
+
+    graph
+  }
+
+  result <- struc_parser_wrapper(
+    c("valid", "invalid"),
+    parser,
+    on_failure = "na"
+  )
+
+  expect_identical(as.character(result), c("Hex(??-", NA_character_))
+})
+
+test_that("struc_parser_wrapper preserves mixed monosaccharide types", {
+  input <- c(
+    generic = "Hex(??-",
+    concrete = "Glc(?1-",
+    generic_duplicate = "Hex(??-",
+    mixed = "Gal(?1-?)HexNAc(?1-",
+    missing = NA_character_
+  )
+
+  result <- struc_parser_wrapper(input, do_parse_iupac_condensed)
+
+  expect_identical(
+    as.character(result),
+    c(
+      generic = "Hex(??-",
+      concrete = "Glc(?1-",
+      generic_duplicate = "Hex(??-",
+      mixed = "Gal(?1-?)HexNAc(?1-",
+      missing = NA_character_
+    )
+  )
+  expect_identical(
+    glyrepr::get_mono_type(result),
+    c(
+      generic = "generic",
+      concrete = "concrete",
+      generic_duplicate = "generic",
+      mixed = "mixed",
+      missing = NA_character_
+    )
+  )
+})

@@ -17,7 +17,7 @@ linucs_parse_cases <- list(
   ),
   alditol_root = list(
     input = "[][D-Glc-ol]{[(?+1)][b-D-Galp]{}}",
-    expected = "Gal(b1-?)Glc(?1-"
+    expected = "Gal(b1-?)Glc-ol(?1-"
   ),
   nested_modifiers = list(
     input = "[][HexpNAc6S]{[(4+1)][HexpA2S]{[(4+1)][HexpNS3S]{[(4+1)][HexpA2S]{}}}}",
@@ -48,6 +48,12 @@ purrr::iwalk(linucs_parse_cases, function(case, case_name) {
   })
 })
 
+test_that("LINUCS preserves root alditol status", {
+  parsed <- parse_linucs("[][D-Glc-ol]{[(?+1)][b-D-Galp]{}}")
+
+  expect_identical(unname(glyrepr::get_alditol(parsed)), TRUE)
+})
+
 test_that("LINUCS preserves NA and name semantics", {
   skip_on_old_win()
 
@@ -59,6 +65,39 @@ test_that("LINUCS preserves NA and name semantics", {
   expect_identical(
     as.character(parsed),
     c(valid = "Hex(?1-", missing = NA_character_)
+  )
+})
+
+test_that("LINUCS preserves unusual configurations", {
+  parsed <- parse_linucs(c(
+    "[][a-L-Fucp]{}",
+    "[][a-D-Fucp3S]{}",
+    "[][b-L-Gulp]{}",
+    "[][?-D-Fucf]{}"
+  ))
+
+  expect_identical(
+    as.character(parsed),
+    c("Fuc(a1-", "D-Fuc3S(a1-", "L-Gul(b1-", "D-Fucf(?1-")
+  )
+})
+
+test_that("LINUCS parses N-sulfate suffixes on unusual configurations", {
+  parsed <- parse_linucs(c(
+    "[][L-GulpNS]{}",
+    "[][L-GulfNS]{}",
+    "[][D-IdopNS]{}",
+    "[][D-IdofNS]{}"
+  ))
+
+  expect_identical(
+    as.character(parsed),
+    c(
+      "L-GulN2S(?1-",
+      "L-GulfN2S(?1-",
+      "D-IdoN2S(?1-",
+      "D-IdofN2S(?1-"
+    )
   )
 })
 
@@ -74,4 +113,23 @@ test_that("LINUCS supports on_failure handling", {
     as.character(parsed),
     c(valid = "Hex(?1-", invalid = NA_character_)
   )
+})
+
+test_that("LINUCS parses every mapped furanose monosaccharide", {
+  mono_map <- linucs_mono_stem_map()
+  furanose <- intersect(
+    unname(furanose_monosaccharide_map()),
+    unname(mono_map)
+  )
+  source_names <- names(mono_map)[match(furanose, mono_map)]
+  input <- paste0("[][b-", source_names, "]{}")
+
+  parsed <- parse_linucs(input)
+  graphs <- glyrepr::get_structure_graphs(parsed, return_list = TRUE)
+
+  expect_identical(purrr::map_chr(graphs, ~ igraph::V(.x)$mono), furanose)
+})
+
+test_that("LINUCS rejects malformed Api furanose aliases", {
+  expect_error(parse_linucs("[][b-D-Afif]{}"), "Can't parse")
 })

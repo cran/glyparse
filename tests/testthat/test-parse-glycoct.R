@@ -13,6 +13,64 @@ test_that("GlycoCT: Gal(b1-3)GalNAc(a1-", {
   expect_equal(result, expected)
 })
 
+test_that("GlycoCT preserves furanose ring bounds", {
+  glcfnac <- paste0(
+    "RES\n",
+    "1b:b-dglc-HEX-1:4\n",
+    "2s:n-acetyl\n",
+    "LIN\n",
+    "1:1d(2+1)2n"
+  )
+  neuf5ac <- paste0(
+    "RES\n",
+    "1b:a-dgro-dgal-NON-2:5|1:a|2:keto|3:d\n",
+    "2s:n-acetyl\n",
+    "LIN\n",
+    "1:1d(5+1)2n"
+  )
+  fruf <- "RES\n1b:b-dara-HEX-2:5|2:keto"
+
+  parsed <- parse_glycoct(c(glcfnac, neuf5ac, fruf))
+
+  expect_identical(
+    as.character(parsed),
+    c("GlcfNAc(b1-", "Neuf5Ac(a2-", "Fruf(b2-")
+  )
+})
+
+test_that("GlycoCT preserves unusual configurations", {
+  parsed <- parse_glycoct(c(
+    "RES\n1b:a-dgal-HEX-1:5|6:d",
+    "RES\n1b:b-lgul-HEX-1:5",
+    "RES\n1b:x-dido-HEX-1:5|6:a",
+    "RES\n1b:a-dgal-HEX-1:4|6:d",
+    "RES\n1b:o-dgal-HEX-0:0|1:aldi|6:d"
+  ))
+  expect_identical(
+    as.character(parsed),
+    c(
+      "D-Fuc(a1-",
+      "L-Gul(b1-",
+      "D-IdoA(?1-",
+      "D-Fucf(a1-",
+      "D-Fuc-ol(?1-"
+    )
+  )
+})
+
+test_that("GlycoCT recognizes the xylHex encoding of Fuc", {
+  glycoct <- c(
+    "RES\n1b:a-lxyl-HEX-1:5|4:d|6:d",
+    "RES\n1b:b-lxyl-HEX-1:5|4:d|6:d",
+    "RES\n1b:x-lxyl-HEX-1:5|4:d|6:d"
+  )
+
+  expect_identical(
+    unname(as.character(parse_glycoct(glycoct))),
+    c("Fuc(a1-", "Fuc(b1-", "Fuc(?1-")
+  )
+})
+
 test_that("GlycoCT accepts space-separated records", {
   glycoct <- paste(
     "RES",
@@ -30,8 +88,13 @@ test_that("GlycoCT accepts space-separated records", {
 })
 
 test_that("GlycoCT maps generic HEX descriptors", {
-  expect_equal(as.character(parse_glycoct("RES\n1b:x-HEX-x:x")), "Hex(??-")
+  expect_equal(as.character(parse_glycoct("RES\n1b:x-HEX-x:x")), "Hex(?1-")
   expect_equal(as.character(parse_glycoct("RES\n1b:x-HEX-1:x|6:d")), "dHex(?1-")
+
+  expect_equal(
+    as.character(parse_glycoct("RES\n1b:x-HEX-1:5|6:a")),
+    "HexA(?1-"
+  )
 
   hexnac <- paste0(
     "RES\n",
@@ -49,8 +112,41 @@ test_that("GlycoCT maps generic HEX descriptors", {
     "1:1d(2+1)2n\n",
     "2:1o(6+1)3n"
   )
+  hexn <- paste0(
+    "RES\n",
+    "1b:x-HEX-1:x\n",
+    "2s:amino\n",
+    "LIN\n",
+    "1:1d(2+1)2n"
+  )
+  hexn_4n <- paste0(
+    "RES\n",
+    "1b:x-HEX-1:x\n",
+    "2s:amino\n",
+    "3s:amino\n",
+    "LIN\n",
+    "1:1d(2+1)2n\n",
+    "2:1d(4+1)3n"
+  )
+  hexn_4n_reversed <- paste0(
+    "RES\n",
+    "1b:x-HEX-1:x\n",
+    "2s:amino\n",
+    "3s:amino\n",
+    "LIN\n",
+    "1:1d(4+1)2n\n",
+    "2:1d(2+1)3n"
+  )
+  expect_equal(as.character(parse_glycoct(hexn)), "HexN(?1-")
+  expect_equal(as.character(parse_glycoct(hexn_4n)), "HexN4N(?1-")
+  expect_equal(as.character(parse_glycoct(hexn_4n_reversed)), "HexN4N(?1-")
   expect_equal(as.character(parse_glycoct(hexnac)), "HexNAc(?1-")
   expect_equal(as.character(parse_glycoct(hexnac_6s)), "HexNAc6S(?1-")
+})
+
+test_that("GlycoCT maps generic PEN descriptors", {
+  expect_equal(as.character(parse_glycoct("RES\n1b:x-PEN-x:x")), "Pen(?1-")
+  expect_equal(as.character(parse_glycoct("RES\n1b:x-PEN-1:4")), "Pen(?1-")
 })
 
 test_that("GlycoCT maps generic Neu5Ac descriptors", {
@@ -231,7 +327,7 @@ test_that("GlycoCT substituents", {
   sub_Me <- "RES\n1b:a-dglc-HEX-1:5\n2s:acetyl\nLIN\n1:1o(3+1)2n\n"
   expect_sub_equal(sub_Me, "3Ac")
   sub_NAc <- "RES\n1b:a-dglc-HEX-1:5\n2s:n-acetyl\nLIN\n1:1d(3+1)2n\n"
-  expect_sub_equal(sub_NAc, "3Ac")
+  expect_sub_equal(sub_NAc, "3NAc")
   sub_P <- "RES\n1b:a-dglc-HEX-1:5\n2s:phosphate\nLIN\n1:1o(3+1)2n\n"
   expect_sub_equal(sub_P, "3P")
   sub_S <- "RES\n1b:a-dglc-HEX-1:5\n2s:sulfate\nLIN\n1:1o(3+1)2n\n"
@@ -240,6 +336,58 @@ test_that("GlycoCT substituents", {
   expect_sub_equal(sub_PPEtn, "3PPEtn")
   sub_PEtn <- "RES\n1b:a-dglc-HEX-1:5\n2s:phospho-ethanolamine\nLIN\n1:1o(3+1)2n\n"
   expect_sub_equal(sub_PEtn, "3PEtn")
+})
+
+test_that("GlycoCT keeps repeated and alternative substituent positions", {
+  repeated_sulfate <- paste0(
+    "RES\n",
+    "1b:x-dglc-HEX-1:5\n",
+    "2s:sulfate\n",
+    "3s:sulfate\n",
+    "LIN\n",
+    "1:1o(3+1)2n\n",
+    "2:1o(6+1)3n"
+  )
+  alternative_sulfate <- paste0(
+    "RES\n",
+    "1b:x-dglc-HEX-1:5\n",
+    "2s:sulfate\n",
+    "LIN\n",
+    "1:1o(3|4+1)2n"
+  )
+  neu5ac_1n <- paste0(
+    "RES\n",
+    "1b:a-dgro-dgal-NON-2:6|1:a|2:keto|3:d\n",
+    "2s:amino\n",
+    "3s:n-acetyl\n",
+    "LIN\n",
+    "1:1d(1+1)2n\n",
+    "2:1d(5+1)3n"
+  )
+  neu5ac_9nac <- paste0(
+    "RES\n",
+    "1b:a-dgro-dgal-NON-2:6|1:a|2:keto|3:d\n",
+    "2s:n-acetyl\n",
+    "3s:n-acetyl\n",
+    "LIN\n",
+    "1:1d(5+1)2n\n",
+    "2:1d(9+1)3n"
+  )
+
+  expect_equal(as.character(parse_glycoct(repeated_sulfate)), "Glc3S6S(?1-")
+  expect_equal(
+    as.character(parse_glycoct(alternative_sulfate)),
+    "Glc3/4S(?1-"
+  )
+  expect_equal(as.character(parse_glycoct(neu5ac_1n)), "Neu5Ac1N(a2-")
+  expect_equal(as.character(parse_glycoct(neu5ac_9nac)), "Neu5Ac9NAc(a2-")
+})
+
+test_that("GlycoCT rejects unrepresentable open-chain residues explicitly", {
+  expect_error(
+    map_single_mono_ringless("dglc-HEX-0:0"),
+    "Open-chain GlycoCT residues without an alditol modification"
+  )
 })
 
 test_that("GlycoCT: GlcA3S(?1-?)Gal(?1-?)GlcNAc(?1-, (Unknown linkages and anomers)", {
@@ -283,6 +431,22 @@ test_that("GlycoCT matches amino sugars with unknown ring bounds", {
   expect_equal(as.character(parse_glycoct(glycoct)), "GlcN(??-")
 })
 
+test_that("GlycoCT mapping signatures index exact composite candidates", {
+  signature <- c(
+    glycoct_mono_signature("dglc-HEX-x:x"),
+    list(subs = "n-acetyl", linkages = "2+1")
+  )
+  mapping_index <- glycoct_mapping_index()
+
+  expect_identical(
+    match_composite_structure(signature, mapping_index),
+    "GlcNAc"
+  )
+
+  signature$linkages <- "5+1"
+  expect_null(match_composite_structure(signature, mapping_index))
+})
+
 test_that("GlycoCT handles N-sulfated amino sugars with unknown ring bounds", {
   glycoct <- paste0(
     "RES\n",
@@ -302,7 +466,7 @@ test_that("GlycoCT handles N-sulfated amino sugars with unknown ring bounds", {
   expect_equal(igraph::vertex_attr(graph, "sub"), "2S")
 })
 
-test_that("GlycoCT warns and uses unknown reducing-end anomers for alditols", {
+test_that("GlycoCT preserves alditols with unknown reducing-end anomers", {
   glcnac_alditol <- paste0(
     "RES\n",
     "1b:o-dglc-HEX-0:0|1:aldi\n",
@@ -310,11 +474,23 @@ test_that("GlycoCT warns and uses unknown reducing-end anomers for alditols", {
     "LIN\n",
     "1:1d(2+1)2n"
   )
-  expect_warning(
-    glcnac_structure <- parse_glycoct(glcnac_alditol),
-    "regular reducing-end glycans with unknown anomer configurations"
+  glcnac_structure <- parse_glycoct(glcnac_alditol)
+  expect_equal(as.character(glcnac_structure), "GlcNAc-ol(?1-")
+  expect_identical(unname(glyrepr::get_alditol(glcnac_structure)), TRUE)
+
+  unknown_ring_alditol <- paste0(
+    "RES\n",
+    "1b:x-dgal-HEX-x:x|1:aldi\n",
+    "2s:n-acetyl\n",
+    "LIN\n",
+    "1:1d(2+1)2n"
   )
-  expect_equal(as.character(glcnac_structure), "GlcNAc(?1-")
+  unknown_ring_structure <- parse_glycoct(unknown_ring_alditol)
+  expect_equal(as.character(unknown_ring_structure), "GalNAc-ol(?1-")
+  expect_identical(
+    unname(glyrepr::get_alditol(unknown_ring_structure)),
+    TRUE
+  )
 
   linked_alditol <- paste0(
     "RES\n",
@@ -325,11 +501,56 @@ test_that("GlycoCT warns and uses unknown reducing-end anomers for alditols", {
     "1:1d(2+1)2n\n",
     "2:1o(4+1)3d"
   )
-  expect_warning(
-    linked_structure <- parse_glycoct(linked_alditol),
-    "regular reducing-end glycans with unknown anomer configurations"
+  linked_structure <- parse_glycoct(linked_alditol)
+  expect_equal(as.character(linked_structure), "Gal(b1-4)GlcNAc-ol(?1-")
+  expect_identical(unname(glyrepr::get_alditol(linked_structure)), TRUE)
+
+  symmetric_man_alditol <- paste0(
+    "RES\n",
+    "1b:o-dman-HEX-0:0|1:aldi\n",
+    "2b:a-lgal-HEX-1:5|6:d\n",
+    "LIN\n",
+    "1:1o(2+1)2d"
   )
-  expect_equal(as.character(linked_structure), "Gal(b1-4)GlcNAc(?1-")
+  symmetric_man_structure <- parse_glycoct(symmetric_man_alditol)
+  expect_equal(
+    as.character(symmetric_man_structure),
+    "Fuc(a1-5)Man-ol(?1-"
+  )
+  expect_identical(
+    unname(glyrepr::get_alditol(symmetric_man_structure)),
+    TRUE
+  )
+})
+
+test_that("GlycoCT warns when non-reducing alditols are normalized", {
+  non_reducing_alditol <- paste0(
+    "RES\n",
+    "1b:a-dgal-HEX-1:5\n",
+    "2b:o-dglc-HEX-0:0|1:aldi\n",
+    "LIN\n",
+    "1:1o(3+1)2d"
+  )
+  expect_warning(
+    structure <- parse_glycoct(non_reducing_alditol),
+    "Only the main reducing-end GlycoCT residue"
+  )
+  expect_identical(as.character(structure), "Glc(?1-3)Gal(a1-")
+  expect_identical(unname(glyrepr::get_alditol(structure)), FALSE)
+
+  root_and_non_reducing_alditols <- paste0(
+    "RES\n",
+    "1b:o-dglc-HEX-0:0|1:aldi\n",
+    "2b:o-dgal-HEX-0:0|1:aldi\n",
+    "LIN\n",
+    "1:1o(4+1)2d"
+  )
+  expect_warning(
+    structure <- parse_glycoct(root_and_non_reducing_alditols),
+    "Only the main reducing-end GlycoCT residue"
+  )
+  expect_identical(as.character(structure), "Gal(?1-4)Glc-ol(?1-")
+  expect_identical(unname(glyrepr::get_alditol(structure)), TRUE)
 })
 
 test_that("GlycoCT parses all distinct converter alditol descriptors", {
@@ -484,15 +705,12 @@ test_that("GlycoCT parses all distinct converter alditol descriptors", {
 
   purrr::iwalk(alditol_mappings, function(mapping, mono_name) {
     glycoct <- create_glycoct_from_mapping(mapping)
-    expect_warning(
-      result <- parse_glycoct(glycoct),
-      "regular reducing-end glycans with unknown anomer configurations"
-    )
+    result <- parse_glycoct(glycoct)
     graph <- glyrepr::get_structure_graphs(result, return_list = FALSE)
 
     expect_equal(igraph::vertex_attr(graph, "mono"), mono_name)
     expect_equal(graph$anomer, paste0("?", glyrepr::get_anomer_pos(mono_name)))
-    expect_false(isTRUE(graph$alditol))
+    expect_identical(graph$alditol, TRUE)
   })
 
   # GlycanFormatConverter emits the same GlycoCT alditol descriptor for Ara-ol
@@ -525,6 +743,70 @@ test_that("all monosaccharides can be parsed", {
     mapping <- mappings[[mono_name]]
     glycoct <- create_glycoct_from_mapping(mapping)
     expect_mono_equal(parse_glycoct(glycoct), mono_name)
+  }
+})
+
+test_that("GlycoCT mappings cover every distinguishable unusual configuration", {
+  unusual_map <- unusual_configuration_monosaccharide_map()
+  concrete <- glyrepr::available_monosaccharides("concrete")
+  mappings <- load_mono_mappings()
+  natural <- intersect(names(mappings), names(unusual_map))
+
+  for (mono in natural) {
+    unusual_name <- unname(unusual_map[[mono]])
+    unusual_mapping <- mappings[[mono]]
+    unusual_mapping$res <- stringr::str_replace_all(
+      unusual_mapping$res,
+      "(?<=-)[dl](?=[a-z])",
+      \(configuration) invert_configuration(configuration)
+    )
+    matching_names <- names(mappings)[purrr::map_lgl(
+      mappings,
+      identical,
+      unusual_mapping
+    )]
+
+    expect_true(
+      unusual_name %in% matching_names || any(matching_names %in% concrete),
+      info = paste("missing unusual GlycoCT mapping for", unusual_name)
+    )
+  }
+})
+
+test_that("GlycoCT parses every representable unusual furanose", {
+  unusual <- unname(unusual_configuration_monosaccharide_map())
+  furanose_map <- furanose_monosaccharide_map()
+  furanose <- intersect(unusual, unname(furanose_map))
+  ringless <- names(furanose_map)[match(furanose, unname(furanose_map))]
+  mappings <- load_mono_mappings()
+  represented <- ringless %in% names(mappings)
+  furanose <- furanose[represented]
+  ringless <- ringless[represented]
+
+  for (index in seq_along(furanose)) {
+    mapping <- mappings[[ringless[[index]]]]
+    mapping$res <- stringr::str_replace_all(
+      mapping$res,
+      c("-1:5" = "-1:4", "-2:6" = "-2:5")
+    )
+    glycoct <- paste(
+      c(
+        "RES",
+        mapping$res,
+        if (length(mapping$lin)) c("LIN", mapping$lin)
+      ),
+      collapse = "\n"
+    )
+    graph <- glyrepr::get_structure_graphs(
+      parse_glycoct(glycoct),
+      return_list = FALSE
+    )
+
+    expect_identical(
+      igraph::V(graph)$mono,
+      furanose[[index]],
+      info = paste("failed to preserve unusual furanose", furanose[[index]])
+    )
   }
 })
 
@@ -565,4 +847,302 @@ test_that("GlycoCT: a complex N-glycan example", {
   result <- as.character(parse_glycoct(glycoct))
   expected <- "Neu5Ac(a2-3/6)Gal(b1-4)GlcNAc(b1-2)Man(a1-3)[Gal(b1-4)GlcNAc(b1-2)Man(a1-6)]Man(b1-4)GlcNAc(b1-4)GlcNAc(b1-"
   expect_equal(result, expected)
+})
+
+test_that("GlycoCT UND sections become floating glycan parts", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "2b:b-dglc-HEX-1:5",
+    "LIN",
+    "1:1o(3+1)2d",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(6+1)d",
+    "RES",
+    "3b:b-dglc-HEX-1:5",
+    "4s:n-acetyl",
+    "5b:b-dgal-HEX-1:5",
+    "LIN",
+    "2:3d(2+1)4n",
+    "3:3o(4+1)5d",
+    "UND2:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(2+1)d",
+    "RES",
+    "6b:a-lgal-HEX-1:5|6:d"
+  )
+
+  result <- parse_glycoct(glycoct)
+  floating <- glyrepr::structure_floating_parts(result)
+
+  expect_identical(
+    unname(as.character(result)),
+    paste0(
+      "{Fuc(a1-2)|4,5}",
+      "{Gal(b1-4)GlcNAc(b1-6)|4,5}",
+      "Glc(b1-3)Gal(a1-"
+    )
+  )
+  expect_identical(floating$linkage, c("a1-2", "b1-6"))
+  expect_equal(floating$nodes, list(1L, c(2L, 3L)))
+  expect_equal(floating$parents, list(c(4L, 5L), c(4L, 5L)))
+})
+
+test_that("substituent-only GlycoCT UND sections become floating", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "2b:b-dglc-HEX-1:5",
+    "LIN",
+    "1:1o(3+1)2d",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(-1+1)n",
+    "RES",
+    "3s:sulfate"
+  )
+
+  result <- parse_glycoct(glycoct)
+  floating <- glyrepr::structure_floating_substituents(result)
+
+  expect_identical(
+    unname(as.character(result)),
+    "{?S}Glc(b1-3)Gal(a1-"
+  )
+  expect_identical(floating$substituent, "?S")
+  expect_equal(floating$parents, list(integer()))
+})
+
+test_that("single-parent GlycoCT UND substituents become ordinary", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1",
+    "SubtreeLinkageID1:o(3+1)n",
+    "RES",
+    "2s:sulfate"
+  )
+
+  result <- parse_glycoct(glycoct)
+
+  expect_identical(unname(as.character(result)), "Gal3S(a1-")
+  expect_identical(
+    unname(glyrepr::has_floating_substituents(result)),
+    FALSE
+  )
+})
+
+test_that("all-main GlycoCT substituent candidates exclude occupied slots", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "2b:b-dglc-HEX-1:5",
+    "LIN",
+    "1:1o(3+1)2d",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(3+1)n",
+    "RES",
+    "3s:sulfate"
+  )
+
+  result <- parse_glycoct(glycoct)
+
+  expect_identical(
+    unname(as.character(result)),
+    "Glc3S(b1-3)Gal(a1-"
+  )
+  expect_identical(
+    unname(glyrepr::has_floating_substituents(result)),
+    FALSE
+  )
+})
+
+test_that("floating substituent positions preserve representable domains", {
+  normalized <- normalize_floating_substituent_parents(
+    c(1L, 2L),
+    c(1L, 2L),
+    "3/6S",
+    c("1\r3", "2\r3"),
+    context = "test substituent"
+  )
+
+  expect_identical(
+    normalized,
+    list(substituent = "6S", parents = integer())
+  )
+  expect_snapshot(
+    error = TRUE,
+    normalize_floating_substituent_parents(
+      c(1L, 2L),
+      c(1L, 2L),
+      "3/6S",
+      c("1\r3", "2\r6"),
+      context = "test substituent"
+    )
+  )
+})
+
+test_that("GlycoCT supports floating parts and substituents together", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "2b:b-dglc-HEX-1:5",
+    "LIN",
+    "1:1o(3+1)2d",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(6+1)d",
+    "RES",
+    "3b:a-lgal-HEX-1:5|6:d",
+    "UND2:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(-1+1)n",
+    "RES",
+    "4s:sulfate"
+  )
+
+  result <- parse_glycoct(glycoct)
+
+  expect_identical(
+    unname(as.character(result)),
+    "{?S|2,3}{Fuc(a1-6)}Glc(b1-3)Gal(a1-"
+  )
+  expect_identical(
+    glyrepr::structure_floating_substituents(result)$substituent,
+    "?S"
+  )
+  expect_identical(
+    glyrepr::structure_floating_parts(result)$linkage,
+    "a1-6"
+  )
+  expect_equal(
+    glyrepr::structure_floating_substituents(result)$parents,
+    list(c(2L, 3L))
+  )
+})
+
+test_that("GlycoCT warns for alditols inside UND sections", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1",
+    "SubtreeLinkageID1:o(3+1)d",
+    "RES",
+    "2b:o-dglc-HEX-0:0|1:aldi"
+  )
+
+  expect_warning(
+    result <- parse_glycoct(glycoct),
+    "Only the main reducing-end GlycoCT residue"
+  )
+  expect_identical(unname(as.character(result)), "Glc(?1-3)Gal(a1-")
+})
+
+test_that("single-parent GlycoCT UND sections become ordinary edges", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1",
+    "SubtreeLinkageID1:o(3+2)d",
+    "RES",
+    "2b:a-dgro-dgal-NON-2:6|1:a|2:keto|3:d",
+    "3s:n-acetyl",
+    "LIN",
+    "7:2d(5+1)3n"
+  )
+
+  result <- parse_glycoct(glycoct)
+
+  expect_identical(unname(as.character(result)), "Neu5Ac(a2-3)Gal(a1-")
+  expect_identical(unname(glyrepr::has_floating_parts(result)), FALSE)
+})
+
+test_that("GlycoCT UND donor alternatives fail explicitly", {
+  und <- c(
+    "UND1:100.0:100.0",
+    "ParentIDs:1",
+    "SubtreeLinkageID1:o(3+1|2)d",
+    "RES",
+    "2b:a-lgal-HEX-1:5|6:d"
+  )
+
+  expect_snapshot(
+    error = TRUE,
+    parse_glycoct_und_block(und)
+  )
+})
+
+test_that("GlycoCT UND candidate parents exclude occupied acceptor slots", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "2b:b-dglc-HEX-1:5",
+    "3b:a-dman-HEX-1:5",
+    "LIN",
+    "1:1o(3+1)2d",
+    "2:1o(4+1)3d",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(3+1)d",
+    "RES",
+    "4b:a-lgal-HEX-1:5|6:d"
+  )
+
+  result <- parse_glycoct(glycoct)
+
+  expect_identical(
+    unname(as.character(result)),
+    "Fuc(a1-3)Glc(b1-3)[Man(a1-4)]Gal(a1-"
+  )
+  expect_identical(unname(glyrepr::has_floating_parts(result)), FALSE)
+})
+
+test_that("all-main GlycoCT UND candidates become implicit", {
+  glycoct <- paste(
+    "RES",
+    "1b:a-dgal-HEX-1:5",
+    "2b:b-dglc-HEX-1:5",
+    "LIN",
+    "1:1o(3+1)2d",
+    "UND",
+    "UND1:100.0:100.0",
+    "ParentIDs:1|2",
+    "SubtreeLinkageID1:o(3+2)d",
+    "RES",
+    "3b:a-dgro-dgal-NON-2:6|1:a|2:keto|3:d",
+    "4s:n-acetyl",
+    "LIN",
+    "2:3d(5+1)4n"
+  )
+
+  result <- parse_glycoct(glycoct)
+
+  expect_identical(
+    unname(as.character(result)),
+    "{Neu5Ac(a2-3)}Glc(b1-3)Gal(a1-"
+  )
+  expect_equal(
+    glyrepr::structure_floating_parts(result)$parents,
+    list(integer())
+  )
+})
+
+test_that("GlycoCT UND parts require a feasible candidate parent", {
+  expect_snapshot(
+    error = TRUE,
+    filter_glycoct_und_parents(1L, "b1-3", "1\r3")
+  )
 })

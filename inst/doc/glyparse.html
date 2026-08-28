@@ -341,26 +341,25 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<div id="your-universal-glycan-text-translator" class="section level2">
-<h2>Your Universal Glycan Text Translator 🔄</h2>
-<p>Welcome to the world of glycan text parsing! If you’ve ever worked
-with glycan data from different sources, you know the frustration: every
-database, software tool, and research group seems to have their own way
-of representing glycan structures in text format.</p>
-<p>That’s where <code>glyparse</code> comes to the rescue! 🚀</p>
-<p>Think of <code>glyparse</code> as your <strong>universal glycan
-translator</strong> — it can read glycan structures written in many
-different “languages” and convert them all into a unified format that
-your computer can understand and work with.</p>
-<p><strong>Note:</strong> All functions in <code>glyparse</code> return
-<code>glyrepr::glycan_structure</code> objects. If you are unfamiliar
-with <code>glyrepr</code>, you can read the documentation <a href="https://glycoverse.github.io/glyrepr/articles/glyrepr.html">here</a>.</p>
+<div id="parsing-glycan-text" class="section level2">
+<h2>Parsing glycan text</h2>
+<p>Glycan structures appear in several text formats. If you work with
+data from different sources, you may find that each database, software
+tool, or research group uses its own conventions for representing
+structures as text.</p>
+<p><code>glyparse</code> provides a parser for each supported format and
+converts the results to a common <code>glyrepr::glycan_structure</code>
+representation.</p>
+<p>This gives you a consistent starting point for structure comparison
+and downstream analysis, without rewriting every input by hand.</p>
+<p>All public parsers return <code>glyrepr::glycan_structure</code>
+objects. If you are unfamiliar with <code>glyrepr</code>, see the <a href="https://glycoverse.github.io/glyrepr/articles/glyrepr.html"><code>glyrepr</code>
+vignette</a>.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(glyparse)</span></code></pre></div>
 </div>
-<div id="the-babel-tower-of-glycan-text-formats" class="section level2">
-<h2>The Babel Tower of Glycan Text Formats 🗼</h2>
-<p>Before we dive in, let’s see what we’re dealing with. Here’s the same
-N-glycan core structure written in different formats:</p>
+<div id="supported-formats" class="section level2">
+<h2>Supported formats</h2>
+<p>Here is a quick overview of the formats supported by the package:</p>
 <table>
 <colgroup>
 <col width="22%" />
@@ -370,111 +369,107 @@ N-glycan core structure written in different formats:</p>
 <thead>
 <tr class="header">
 <th>Format</th>
-<th>Example</th>
-<th>Where You’ll See It</th>
+<th>Parser</th>
+<th>Common sources</th>
 </tr>
 </thead>
 <tbody>
 <tr class="odd">
 <td><strong>IUPAC-condensed</strong></td>
-<td><code>Man(a1-3)[Man(a1-6)]Man(b1-4)GlcNAc(b1-4)GlcNAc</code></td>
+<td><code>parse_iupac_condensed()</code></td>
 <td>Literature, UniCarbKB</td>
 </tr>
 <tr class="even">
 <td><strong>IUPAC-short</strong></td>
-<td><code>Mana3(Mana6)Manb4GlcNAcb4GlcNAc</code></td>
+<td><code>parse_iupac_short()</code></td>
 <td>Literature, UniCarbKB</td>
 </tr>
 <tr class="odd">
 <td><strong>IUPAC-extended</strong></td>
-<td><code>alpha-D-Man-(1-&gt;3)-[alpha-D-Man-(1-&gt;6)]-beta-D-Man-(1-&gt;4)-beta-D-GlcNAc-(1-&gt;4)-D-GlcNAc</code></td>
+<td><code>parse_iupac_extended()</code></td>
 <td>Literature, UniCarbKB</td>
 </tr>
 <tr class="even">
+<td><strong>IUPAC-compact</strong></td>
+<td><code>parse_iupac_compact()</code></td>
+<td>Compact database and literature notation</td>
+</tr>
+<tr class="odd">
+<td><strong>GlyCAM IUPAC</strong></td>
+<td><code>parse_glycam_iupac()</code></td>
+<td>GlyCAM workflows</td>
+</tr>
+<tr class="even">
 <td><strong>GlycoCT</strong></td>
-<td>Complex multi-line format</td>
+<td><code>parse_glycoct()</code></td>
 <td>Literature, GlycomeDB</td>
 </tr>
 <tr class="odd">
 <td><strong>WURCS</strong></td>
-<td><code>WURCS=2.0/3,5,4/[...]/1-1-2-3-3/a4-b1_b4-c1...</code></td>
+<td><code>parse_wurcs()</code></td>
 <td>Literature, GlyTouCan</td>
 </tr>
 <tr class="even">
 <td><strong>Linear Code</strong></td>
-<td><code>Ma3(Ma6)Mb4GNb4GNb</code></td>
+<td><code>parse_linear_code()</code></td>
 <td>Literature</td>
 </tr>
 <tr class="odd">
-<td><strong>pGlyco</strong></td>
-<td><code>(N(N(H(H(H)))))</code></td>
-<td>pGlyco software results</td>
+<td><strong>LINUCS</strong></td>
+<td><code>parse_linucs()</code></td>
+<td>Glycan structure software</td>
 </tr>
 <tr class="even">
+<td><strong>KCF</strong></td>
+<td><code>parse_kcf()</code></td>
+<td>KEGG GLYCAN</td>
+</tr>
+<tr class="odd">
+<td><strong>GlycoWorkbench</strong></td>
+<td><code>parse_gwb()</code></td>
+<td>GlycoWorkbench and GWS files</td>
+</tr>
+<tr class="even">
+<td><strong>pGlyco</strong></td>
+<td><code>parse_pglyco_struc()</code></td>
+<td>pGlyco software results</td>
+</tr>
+<tr class="odd">
 <td><strong>StrucGP</strong></td>
-<td><code>A2B2C1D1E2fedcba</code></td>
+<td><code>parse_strucgp_struc()</code></td>
 <td>StrucGP software results</td>
 </tr>
 </tbody>
 </table>
-<p>Confusing, right? 😵‍💫 <code>glyparse</code> understands them all!</p>
+<p>The package includes an automatic parser and 13 format-specific
+parsers. Each parser accepts a character vector of structure strings and
+returns a <code>glyrepr::glycan_structure</code> object.</p>
 </div>
-<div id="your-parsing-toolkit" class="section level2">
-<h2>Your Parsing Toolkit 🛠️</h2>
-<p><code>glyparse</code> provides seven specialized parsers, each
-optimized for a specific format:</p>
-<ul>
-<li><strong><code>parse_iupac_condensed()</code></strong>: The most
-common format</li>
-<li><strong><code>parse_iupac_short()</code></strong>: Compact
-literature format<br />
-</li>
-<li><strong><code>parse_iupac_extended()</code></strong>: Verbose formal
-format</li>
-<li><strong><code>parse_glycoct()</code></strong>: Database standard
-format</li>
-<li><strong><code>parse_wurcs()</code></strong>: Modern standardized
-format</li>
-<li><strong><code>parse_linear_code()</code></strong>: Linear Code
-format</li>
-<li><strong><code>parse_pglyco_struc()</code></strong>: pGlyco software
-format</li>
-<li><strong><code>parse_strucgp_struc()</code></strong>: StrucGP
-software format</li>
-</ul>
-<p>All parsers follow the same pattern:</p>
-<ul>
-<li><strong>Input</strong>: Character vector of structure strings</li>
-<li><strong>Output</strong>: A <code>glyrepr::glycan_structure</code>
-object that you can analyze</li>
-</ul>
-</div>
-<div id="part-0-auto_parse" class="section level2">
-<h2>Part 0: <code>auto_parse()</code></h2>
-<p>Don’t know what you’re dealing with? Give it to
-<code>auto_parse()</code>! This function tries to identify the format
-automatically and use the appropriate parser. Even input with mixed
-formats is supported.</p>
+<div id="part-1-automatic-parsing" class="section level2">
+<h2>Part 1: Automatic parsing</h2>
+<p>When the input format is not known in advance, use
+<code>auto_parse()</code>. It detects the format one element at a time,
+so a vector can contain mixed formats.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>x <span class="ot">&lt;-</span> <span class="fu">c</span>(</span>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>  <span class="st">&quot;Gal(b1-3)GalNAc(b1-&quot;</span>,</span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="st">&quot;(N(F)(N(H(H(N))(H(N(H))))))&quot;</span>,</span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a>  <span class="st">&quot;WURCS=2.0/3,3,2/[a2122h-1b_1-5][a1122h-1b_1-5][a1122h-1a_1-5]/1-2-3/a4-b1_b3-c1&quot;</span></span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>)</span>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">auto_parse</span>(x)</span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; Error in `validate_glycan_structure_vector()`:</span></span>
-<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; ! All structures must have the same monosaccharide type.</span></span>
-<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt; ✖ Found 2 concrete and 1 generic structure(s) in the same vector.</span></span>
-<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; ℹ Use `convert_to_generic()` to convert concrete structures to generic type.</span></span></code></pre></div>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[3]&gt;</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; [1] Gal(b1-3)GalNAc(b1-</span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt; [2] Hex(??-?)HexNAc(??-?)Hex(??-?)[HexNAc(??-?)Hex(??-?)]Hex(??-?)HexNAc(??-?)[dHex(??-?)]HexNAc(??-</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; [3] Man(a1-3)Man(b1-4)Glc(b1-</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 3</span></span></code></pre></div>
 </div>
-<div id="part-1-iupac-family-the-popular-kids" class="section level2">
-<h2>Part 1: IUPAC Family — The Popular Kids 🌟</h2>
-<p>Let’s start with the IUPAC formats.</p>
-<div id="iupac-condensed-the-literature-standard" class="section level3">
-<h3>IUPAC-Condensed: The Literature Standard</h3>
+<div id="part-2-iupac-notation" class="section level2">
+<h2>Part 2: IUPAC notation</h2>
+<div id="iupac-condensed" class="section level3">
+<h3>IUPAC-condensed</h3>
 <p>This format is widely used in scientific literature and databases
 like UniCarbKB.</p>
-<p>Want to know more about IUPAC-condensed format? Check <a href="https://glycoverse.github.io/glyrepr/articles/iupac.html">this</a>
-out!</p>
+<p>For more detail about this notation, see the <a href="https://glycoverse.github.io/glyrepr/articles/iupac.html"><code>glyrepr</code>
+IUPAC vignette</a>.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Single structure</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a>iupac_condensed <span class="ot">&lt;-</span> <span class="st">&quot;Neu5Ac(a2-3)Gal(b1-4)[Fuc(a1-3)]GlcNAc(b1-4)Gal(b1-4)Glc(a1-&quot;</span></span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="fu">parse_iupac_condensed</span>(iupac_condensed)</span>
@@ -494,8 +489,8 @@ out!</p>
 <span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; [3] Neu5Ac(a2-3)Gal(b1-3)[GlcNAc(b1-6)]GalNAc(b1-</span></span>
 <span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 3</span></span></code></pre></div>
 </div>
-<div id="iupac-short-literatures-favorite" class="section level3">
-<h3>IUPAC-Short: Literature’s Favorite</h3>
+<div id="iupac-short" class="section level3">
+<h3>IUPAC-short</h3>
 <p>This compact format is popular in research papers because it saves
 space:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># The same structures in short format</span></span>
@@ -510,118 +505,184 @@ space:</p>
 <span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; [2] Gal(b1-3)GalNAc(b1-</span></span>
 <span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; [3] Neu5Ac(a2-3)Gal(b1-3)[GlcNAc(b1-6)]GalNAc(b1-</span></span>
 <span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 3</span></span></code></pre></div>
-<p>Notice how much more compact this is! The parser is smart enough to
-infer common linkage positions (like Neu5Ac always being a2-linked).</p>
+<p>The parser infers common linkage positions when they are omitted.</p>
 </div>
-<div id="iupac-extended-the-formal-one" class="section level3">
-<h3>IUPAC-Extended: The Formal One</h3>
+<div id="iupac-extended" class="section level3">
+<h3>IUPAC-extended</h3>
 <p>This verbose format includes full chemical names and
 stereochemistry:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>iupac_extended <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;α-D-Manp-(1→3)[α-D-Manp-(1→6)]-β-D-Manp-(1→4)&quot;</span>,</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="st">&quot;-β-D-GlcpNAc-(1→4)-β-D-GlcpNAc-(1→&quot;</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="st">&quot;alpha-D-Galp-(1-&gt;3)-&quot;</span>,</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="st">&quot;beta-D-Galp-(1-&gt;&quot;</span></span>
 <span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>)</span>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="fu">parse_iupac_extended</span>(iupac_extended)</span>
 <span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)[Man(a1-6)]Man(b1-4)GlcNAc(b1-4)GlcNAc(b1-</span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; [1] Gal(a1-3)Gal(b1-</span></span>
 <span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
 </div>
+<div id="iupac-compact" class="section level3">
+<h3>IUPAC-compact</h3>
+<p>IUPAC-compact notation places the linkage immediately after each
+residue and uses parentheses for branches.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>iupac_compact <span class="ot">&lt;-</span> <span class="st">&quot;Mana1-3(Mana1-6)Manb1-4GlcNAcb&quot;</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">parse_iupac_compact</span>(iupac_compact)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)[Man(a1-6)]Man(b1-4)GlcNAc(b1-</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
 </div>
-<div id="part-2-database-formats-the-heavy-hitters" class="section level2">
-<h2>Part 2: Database Formats — The Heavy Hitters 💪</h2>
-<div id="glycoct-the-precision-format" class="section level3">
-<h3>GlycoCT: The Precision Format</h3>
-<p>GlycoCT is used in literature for precise representation and in
-databases like GlycomeDB. It’s more complex but extremely precise:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>glycoct <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>  <span class="st">&quot;RES</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  <span class="st">&quot;1b:b-dglc-HEX-1:5</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="st">&quot;2b:b-dgal-HEX-1:5</span><span class="sc">\n</span><span class="st">&quot;</span>, </span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>  <span class="st">&quot;3b:a-dgal-HEX-1:5</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
-<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>  <span class="st">&quot;LIN</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
-<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  <span class="st">&quot;1:1o(4+1)2d</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
-<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>  <span class="st">&quot;2:2o(3+1)3d&quot;</span></span>
-<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a>)</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="fu">parse_glycoct</span>(glycoct)</span>
-<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
-<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; [1] Gal(a1-3)Gal(b1-4)Glc(b1-</span></span>
-<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
-</div>
-<div id="wurcs-the-complex-structure-format" class="section level3">
-<h3>WURCS: The Complex Structure Format</h3>
-<p>WURCS (Web3 Unique Representation of Carbohydrate Structures) is used
-in literature for complex structures and in databases like
-GlyTouCan:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>wurcs <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="st">&quot;WURCS=2.0/3,3,2/&quot;</span>,</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="st">&quot;[a2122h-1b_1-5][a1122h-1b_1-5][a1122h-1a_1-5]/&quot;</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="st">&quot;1-2-3/a4-b1_b3-c1&quot;</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>)</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="fu">parse_wurcs</span>(wurcs)</span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
-<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)Man(b1-4)Glc(b1-</span></span>
-<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
-</div>
-<div id="linear-code-the-simplified-format" class="section level3">
-<h3>Linear Code: The Simplified Format</h3>
-<p>Linear Code is a simplified format used in literature for complex
-structures:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>linear_code <span class="ot">&lt;-</span> <span class="st">&quot;Ma3(Ma6)Mb4GNb4GNb&quot;</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">parse_linear_code</span>(linear_code)</span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)[Man(a1-6)]Man(b1-4)GlcNAc(b1-4)GlcNAc(b1-</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+<div id="glycam-iupac" class="section level3">
+<h3>GlyCAM IUPAC</h3>
+<p>GlyCAM IUPAC strings include configuration and ring markers such as
+<code>DManp</code> and use a terminal <code>-OH</code> marker for the
+reducing end. The parser normalizes these strings before parsing
+them.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>glycam <span class="ot">&lt;-</span> <span class="st">&quot;DManpa1-3[DManpa1-6]DManpb1-4DGlcpNAcb1-OH&quot;</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">parse_glycam_iupac</span>(glycam)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)[Man(a1-6)]Man(b1-4)GlcNAc(b1-</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
 </div>
 </div>
-<div id="part-3-software-specific-formats-the-specialists" class="section level2">
-<h2>Part 3: Software-Specific Formats — The Specialists 🔬</h2>
-<div id="pglyco-format-proteomics-tool" class="section level3">
-<h3>pGlyco Format: Proteomics Tool</h3>
-<p>If you work with glycoproteomics, you might encounter pGlyco’s
+<div id="part-3-database-and-exchange-formats" class="section level2">
+<h2>Part 3: Database and exchange formats</h2>
+<div id="glycoct" class="section level3">
+<h3>GlycoCT</h3>
+<p>GlycoCT uses separate <code>RES</code> and <code>LIN</code> sections.
+It is verbose, but records residue and linkage information
+explicitly.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>glycoct <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>  <span class="st">&quot;RES</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a>  <span class="st">&quot;1b:b-dglc-HEX-1:5</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>  <span class="st">&quot;2b:b-dgal-HEX-1:5</span><span class="sc">\n</span><span class="st">&quot;</span>, </span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a>  <span class="st">&quot;3b:a-dgal-HEX-1:5</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a>  <span class="st">&quot;LIN</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a>  <span class="st">&quot;1:1o(4+1)2d</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>  <span class="st">&quot;2:2o(3+1)3d&quot;</span></span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>)</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a><span class="fu">parse_glycoct</span>(glycoct)</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a><span class="co">#&gt; [1] Gal(a1-3)Gal(b1-4)Glc(b1-</span></span>
+<span id="cb9-13"><a href="#cb9-13" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+</div>
+<div id="wurcs" class="section level3">
+<h3>WURCS</h3>
+<p>WURCS (Web3 Unique Representation of Carbohydrate Structures) is a
+compact standardised exchange format used by resources such as
+GlyTouCan.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>wurcs <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>  <span class="st">&quot;WURCS=2.0/3,3,2/&quot;</span>,</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="st">&quot;[a2122h-1b_1-5][a1122h-1b_1-5][a1122h-1a_1-5]/&quot;</span>,</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="st">&quot;1-2-3/a4-b1_b3-c1&quot;</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>)</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="fu">parse_wurcs</span>(wurcs)</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)Man(b1-4)Glc(b1-</span></span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+</div>
+<div id="kcf" class="section level3">
+<h3>KCF</h3>
+<p>KCF represents a glycan as a graph with <code>NODE</code> and
+<code>EDGE</code> sections. It is used by KEGG GLYCAN.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>kcf <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="st">&quot;ENTRY       G00066                      Glycan</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="st">&quot;NODE        6</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="st">&quot;            1   Cer        18     0</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>  <span class="st">&quot;            2   Glc        12     0</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  <span class="st">&quot;            3   Gal         6     0</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a>  <span class="st">&quot;            4   GlcNAc     -2     0</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="st">&quot;            5   Gal       -10     0</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  <span class="st">&quot;            6   GlcNAc    -18     0</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>  <span class="st">&quot;EDGE        5</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a>  <span class="st">&quot;            1     2:b1    1:1</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a>  <span class="st">&quot;            2     3:b1    2:4</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a>  <span class="st">&quot;            3     4:b1    3:3</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a>  <span class="st">&quot;            4     5:b1    4:4</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a>  <span class="st">&quot;            5     6:b1    5:3</span><span class="sc">\n</span><span class="st">&quot;</span>,</span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a>  <span class="st">&quot;///&quot;</span></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a>)</span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="fu">parse_kcf</span>(kcf)</span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="co">#&gt; [1] GlcNAc(b1-3)Gal(b1-4)GlcNAc(b1-3)Gal(b1-4)Glc(b1-</span></span>
+<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+</div>
+<div id="linear-code" class="section level3">
+<h3>Linear Code</h3>
+<p>Linear Code is a compact notation used in literature and glycan
+software:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a>linear_code <span class="ot">&lt;-</span> <span class="st">&quot;Ma3(Ma6)Mb4GNb4GNb&quot;</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">parse_linear_code</span>(linear_code)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; [1] Man(a1-3)[Man(a1-6)]Man(b1-4)GlcNAc(b1-4)GlcNAc(b1-</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+</div>
+<div id="linucs" class="section level3">
+<h3>LINUCS</h3>
+<p>LINUCS expresses each residue as a token followed by a braced child
+list. A linkage such as <code>[(4+1)]</code> records the parent and
+child positions.</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a>linucs <span class="ot">&lt;-</span> <span class="st">&quot;[][b-D-Glcp]{[(4+1)][b-D-Galp]{}}&quot;</span></span>
+<span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">parse_linucs</span>(linucs)</span>
+<span id="cb13-3"><a href="#cb13-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb13-4"><a href="#cb13-4" tabindex="-1"></a><span class="co">#&gt; [1] Gal(b1-4)Glc(b1-</span></span>
+<span id="cb13-5"><a href="#cb13-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+</div>
+</div>
+<div id="part-4-software-specific-formats" class="section level2">
+<h2>Part 4: Software-specific formats</h2>
+<div id="glycoworkbench" class="section level3">
+<h3>GlycoWorkbench</h3>
+<p>GlycoWorkbench strings describe the structure from the reducing end
+and may include mass options after <code>$</code>. Those options are
+ignored because they are not part of the glycan graph.</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" tabindex="-1"></a>gwb <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>  <span class="st">&quot;freeEnd--1b1D-GlcNAc,p(--6a1L-Fuc,p)&quot;</span>,</span>
+<span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>  <span class="st">&quot;--4b1D-Gal,p--3a2D-NeuAc,p$MONO,Und,0,0,freeEnd&quot;</span></span>
+<span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>)</span>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a><span class="fu">parse_gwb</span>(gwb)</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a><span class="co">#&gt; [1] Neu5Ac(a2-3)Gal(b1-4)[Fuc(a1-6)]GlcNAc(b1-</span></span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+</div>
+<div id="pglyco" class="section level3">
+<h3>pGlyco</h3>
+<p>If you work with glycoproteomics, you may encounter pGlyco’s
 parenthetical notation:</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>pglyco <span class="ot">&lt;-</span> <span class="st">&quot;(N(F)(N(H(H(N))(H(N(H))))))&quot;</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">parse_pglyco_struc</span>(pglyco)</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; [1] Hex(??-?)HexNAc(??-?)Hex(??-?)[HexNAc(??-?)Hex(??-?)]Hex(??-?)HexNAc(??-?)[dHex(??-?)]HexNAc(??-</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
-<p>This cryptic notation actually represents a complex N-glycan:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>pglyco <span class="ot">&lt;-</span> <span class="st">&quot;(N(F)(N(H(H(N))(H(N(H))))))&quot;</span></span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">parse_pglyco_struc</span>(pglyco)</span>
+<span id="cb15-3"><a href="#cb15-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb15-4"><a href="#cb15-4" tabindex="-1"></a><span class="co">#&gt; [1] Hex(??-?)HexNAc(??-?)Hex(??-?)[HexNAc(??-?)Hex(??-?)]Hex(??-?)HexNAc(??-?)[dHex(??-?)]HexNAc(??-</span></span>
+<span id="cb15-5"><a href="#cb15-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+<p>In this notation:</p>
 <ul>
 <li>N = HexNAc</li>
-<li>F = Fuc<br />
-</li>
+<li>F = Fuc</li>
 <li>H = Hex (Man or Gal)</li>
 </ul>
 </div>
-<div id="strucgp-format-alphabetical-system" class="section level3">
-<h3>StrucGP Format: Alphabetical System</h3>
+<div id="strucgp" class="section level3">
+<h3>StrucGP</h3>
 <p>StrucGP uses a letter-based encoding system:</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>strucgp <span class="ot">&lt;-</span> <span class="st">&quot;A2B2C1D1E2F1fedD1E2edcbB5ba&quot;</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">parse_strucgp_struc</span>(strucgp)</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; [1] Hex(??-?)HexNAc(??-?)Hex(??-?)[HexNAc(??-?)Hex(??-?)]Hex(??-?)HexNAc(??-?)[dHex(??-?)]HexNAc(??-</span></span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" tabindex="-1"></a>strucgp <span class="ot">&lt;-</span> <span class="st">&quot;A2B2C1D1E2F1fedD1E2edcbB5ba&quot;</span></span>
+<span id="cb16-2"><a href="#cb16-2" tabindex="-1"></a><span class="fu">parse_strucgp_struc</span>(strucgp)</span>
+<span id="cb16-3"><a href="#cb16-3" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[1]&gt;</span></span>
+<span id="cb16-4"><a href="#cb16-4" tabindex="-1"></a><span class="co">#&gt; [1] Hex(??-?)HexNAc(??-?)Hex(??-?)[HexNAc(??-?)Hex(??-?)]Hex(??-?)HexNAc(??-?)[dHex(??-?)]HexNAc(??-</span></span>
+<span id="cb16-5"><a href="#cb16-5" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
 </div>
 </div>
-<div id="the-bottom-line" class="section level2">
-<h2>The Bottom Line 🎯</h2>
-<p><code>glyparse</code> transforms the chaos of glycan text formats
-into order. No matter where your glycan data comes from, databases,
-literature, or software tools, you can now parse it into
-<code>glyrepr::glycan_structure()</code> for further analysis. In fact,
-<code>glyread</code> package uses these parsing functions internally
-when reading output from common glycopeptide identification
-softwares.</p>
-<p><strong>Next steps:</strong></p>
-<ul>
-<li>Explore the <code>glyrepr</code> package for structure
-manipulation</li>
-<li>Try <code>glymotif</code> for motif analysis of your parsed
-structures<br />
-</li>
-<li>Use <code>glyexp</code> for experimental data analysis</li>
-<li>Check out the rest of the <code>glycoverse</code> ecosystem!</li>
-</ul>
-<p>Happy parsing! 🧬✨</p>
+<div id="handling-parsing-failures" class="section level2">
+<h2>Handling parsing failures</h2>
+<p>By default, a malformed structure stops the call with an informative
+error. When processing a larger collection,
+<code>on_failure = &quot;na&quot;</code> preserves the input positions and returns
+<code>NA</code> for records that cannot be parsed.</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">parse_iupac_compact</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" tabindex="-1"></a>  <span class="fu">c</span>(<span class="at">valid =</span> <span class="st">&quot;Galb1-3GalNAca&quot;</span>, <span class="at">invalid =</span> <span class="st">&quot;not a glycan&quot;</span>),</span>
+<span id="cb17-3"><a href="#cb17-3" tabindex="-1"></a>  <span class="at">on_failure =</span> <span class="st">&quot;na&quot;</span></span>
+<span id="cb17-4"><a href="#cb17-4" tabindex="-1"></a>)</span>
+<span id="cb17-5"><a href="#cb17-5" tabindex="-1"></a><span class="co">#&gt; &lt;glycan_structure[2]&gt;</span></span>
+<span id="cb17-6"><a href="#cb17-6" tabindex="-1"></a><span class="co">#&gt; [1] valid    Gal(b1-3)GalNAc(a1-</span></span>
+<span id="cb17-7"><a href="#cb17-7" tabindex="-1"></a><span class="co">#&gt; [2] invalid  NA</span></span>
+<span id="cb17-8"><a href="#cb17-8" tabindex="-1"></a><span class="co">#&gt; # Unique structures: 1</span></span></code></pre></div>
 </div>
 
 

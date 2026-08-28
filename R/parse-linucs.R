@@ -10,12 +10,15 @@
 #' linkage position on the parent residue and `child` is the anomeric linkage
 #' position on the child residue. Residue labels are normalized to the
 #' monosaccharide and substituent vocabulary used by [glyrepr].
+#' A `-ol` suffix on the root residue is retained as alditol status.
 #'
 #' @param x A character vector of LINUCS strings. NA values are allowed and
 #'   will be returned as NA structures.
 #' @param on_failure How to handle parsing failures. `"error"` aborts when a
 #'   structure cannot be parsed. `"na"` returns `NA` at invalid positions.
 #' @param progress Whether to show a progress bar while parsing.
+#' @param validate Whether to validate parsed glycan graphs before constructing
+#'   the result.
 #'
 #' @return A [glyrepr::glycan_structure()] object.
 #'
@@ -24,12 +27,18 @@
 #' parse_linucs(linucs)
 #'
 #' @export
-parse_linucs <- function(x, on_failure = "error", progress = FALSE) {
+parse_linucs <- function(
+  x,
+  on_failure = "error",
+  progress = FALSE,
+  validate = TRUE
+) {
   struc_parser_wrapper(
     x,
     do_parse_linucs,
     on_failure = on_failure,
-    progress = progress
+    progress = progress,
+    validate = validate
   )
 }
 
@@ -184,6 +193,7 @@ parse_linucs_residue <- function(x) {
   }
 
   anomer <- parse_linucs_anomer(x)
+  alditol <- stringr::str_ends(anomer$label, stringr::fixed("-ol"))
   normalized <- normalize_linucs_residue_label(anomer$label)
   stem_match <- match_linucs_mono_stem(normalized)
   mono <- unname(linucs_mono_stem_map()[[stem_match$stem]])
@@ -197,6 +207,7 @@ parse_linucs_residue <- function(x) {
     mono = mono,
     anomer = paste0(anomer$value, decide_anomer_pos(mono)),
     anomer_value = anomer$value,
+    alditol = alditol,
     sub = sub
   )
 }
@@ -285,7 +296,7 @@ match_linucs_mono_stem <- function(x) {
 #' @return A named character vector.
 #' @noRd
 linucs_mono_stem_map <- function() {
-  c(
+  map <- c(
     `6-deoxy-HexpNAc` = "dHexNAc",
     `6-deoxy-HexNAc` = "dHexNAc",
     HexpNAc = "HexNAc",
@@ -345,7 +356,7 @@ linucs_mono_stem_map <- function() {
     `D-QuipNAc` = "QuiNAc",
     `L-RhapNAc` = "RhaNAc",
     `L-Fucp` = "Fuc",
-    `D-Fucp` = "dHex",
+    `D-Fucp` = "Fuc",
     `D-Quip` = "Qui",
     `L-Rhap` = "Rha",
     `D-Olip` = "Oli",
@@ -388,6 +399,31 @@ linucs_mono_stem_map <- function() {
     `L-Sorp` = "Sor",
     `D-Psip` = "Psi"
   )
+
+  unusual_map <- unusual_configuration_monosaccharide_map()
+  configurable <- unname(map) %in%
+    names(unusual_map) &
+    stringr::str_detect(names(map), "(^|6-deoxy-)[DL]-")
+  configurations <- stringr::str_extract(
+    names(map)[configurable],
+    "[DL](?=-)"
+  )
+  natural_monos <- unname(map[configurable])
+  map[configurable] <- apply_monosaccharide_configuration(
+    natural_monos,
+    configurations
+  )
+  unusual_sources <- stringr::str_replace(
+    names(map)[configurable],
+    "[DL](?=-)",
+    \(configuration) invert_configuration(configuration)
+  )
+  map[unusual_sources] <- apply_monosaccharide_configuration(
+    natural_monos,
+    invert_configuration(configurations)
+  )
+
+  add_furanose_monosaccharide_mappings(map)
 }
 
 
@@ -445,7 +481,7 @@ parse_linucs_residue_substituents <- function(x, mono) {
 #' @return A character vector of glyrepr monosaccharide names.
 #' @noRd
 linucs_n_sulfate_monos <- function() {
-  c(
+  monos <- c(
     "HexN",
     "GlcN",
     "ManN",
@@ -456,6 +492,9 @@ linucs_n_sulfate_monos <- function() {
     "TalN",
     "IdoN"
   )
+  unusual <- unname(unusual_configuration_monosaccharide_map()[monos])
+  monos <- c(monos, unusual[!is.na(unusual)])
+  unique(c(monos, as_furanose_monosaccharide(monos)))
 }
 
 
@@ -513,7 +552,7 @@ build_linucs_graph <- function(root) {
 
   graph <- igraph::graph_from_data_frame(edge_df, vertices = vertex_df)
   graph$anomer <- root$residue$anomer
-  graph$alditol <- FALSE
+  graph$alditol <- isTRUE(root$residue$alditol)
   graph
 }
 
@@ -528,6 +567,11 @@ build_linucs_graph <- function(root) {
 add_linucs_mono_node <- function(node, state) {
   if (!identical(node$residue$kind, "mono")) {
     cli::cli_abort("Expected a LINUCS monosaccharide node.")
+  }
+  if (isTRUE(node$residue$alditol) && length(state$vertices) > 0L) {
+    cli::cli_abort(
+      "Only the root LINUCS residue can contain an alditol marker."
+    )
   }
 
   node_id <- length(state$vertices) + 1

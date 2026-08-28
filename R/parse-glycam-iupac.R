@@ -30,10 +30,14 @@
 #' @seealso [parse_iupac_condensed()]
 #'
 #' @export
-parse_glycam_iupac <- function(x, on_failure = "error", progress = FALSE) {
-  struc_parser_wrapper(
+parse_glycam_iupac <- function(
+  x,
+  on_failure = "error",
+  progress = FALSE
+) {
+  normalized_struc_parser_wrapper(
     x,
-    do_parse_glycam_iupac,
+    convert_glycam_iupac_to_condensed,
     on_failure = on_failure,
     progress = progress
   )
@@ -53,9 +57,9 @@ do_parse_glycam_iupac <- function(x) {
 
 #' Convert GlyCAM IUPAC to IUPAC-condensed notation
 #'
-#' @param x A single GlyCAM IUPAC string.
+#' @param x A character vector of GlyCAM IUPAC strings.
 #'
-#' @return A character scalar containing IUPAC-condensed notation.
+#' @return A character vector containing IUPAC-condensed notation.
 #' @noRd
 convert_glycam_iupac_to_condensed <- function(x) {
   token_pattern <- paste(
@@ -64,23 +68,36 @@ convert_glycam_iupac_to_condensed <- function(x) {
     "\\]",
     sep = "|"
   )
-  tokens <- stringr::str_extract_all(x, token_pattern)[[1]]
+  tokens <- stringr::str_extract_all(x, token_pattern)
 
-  if (length(tokens) == 0 || paste0(tokens, collapse = "") != x) {
+  reconstructed <- purrr::map_chr(tokens, ~ paste0(.x, collapse = ""))
+  if (any(lengths(tokens) == 0 | reconstructed != x)) {
     cli::cli_abort("Failed to parse the GlyCAM IUPAC string.")
   }
 
-  paste0(purrr::map_chr(tokens, convert_glycam_iupac_token), collapse = "")
+  mono_map <- glycam_iupac_mono_map()
+  purrr::map_chr(tokens, function(tokens) {
+    converted <- purrr::map_chr(
+      tokens,
+      convert_glycam_iupac_token,
+      mono_map = mono_map
+    )
+    paste0(converted, collapse = "")
+  })
 }
 
 
 #' Convert one GlyCAM IUPAC token to IUPAC-condensed notation
 #'
 #' @param token A GlyCAM residue token or branch bracket.
+#' @param mono_map A GlyCAM monosaccharide name map.
 #'
 #' @return A character scalar containing the converted token.
 #' @noRd
-convert_glycam_iupac_token <- function(token) {
+convert_glycam_iupac_token <- function(
+  token,
+  mono_map = glycam_iupac_mono_map()
+) {
   if (token %in% c("[", "]")) {
     return(token)
   }
@@ -91,7 +108,7 @@ convert_glycam_iupac_token <- function(token) {
     cli::cli_abort("Failed to parse GlyCAM IUPAC residue: {.val {token}}")
   }
 
-  mono <- convert_glycam_iupac_mono(residue_match[1, 2])
+  mono <- convert_glycam_iupac_mono(residue_match[1, 2], mono_map)
   modifiers <- convert_glycam_iupac_modifiers(
     stringr::str_extract_all(
       token,
@@ -150,12 +167,14 @@ is_glycam_iupac_reducing_end_moiety <- function(x) {
 #' Convert a GlyCAM monosaccharide name to a glyrepr monosaccharide name
 #'
 #' @param mono A GlyCAM monosaccharide label, such as `"DGlcpNAc"`.
+#' @param mono_map A GlyCAM monosaccharide name map.
 #'
 #' @return A glyrepr monosaccharide name.
 #' @noRd
-convert_glycam_iupac_mono <- function(mono) {
-  mono_map <- glycam_iupac_mono_map()
-
+convert_glycam_iupac_mono <- function(
+  mono,
+  mono_map = glycam_iupac_mono_map()
+) {
   converted <- unname(mono_map[[mono]])
   if (is.null(converted)) {
     cli::cli_abort("Unknown GlyCAM IUPAC monosaccharide: {.val {mono}}")
@@ -170,7 +189,7 @@ convert_glycam_iupac_mono <- function(mono) {
 #' @return A named character vector mapping GlyCAM labels to glyrepr labels.
 #' @noRd
 glycam_iupac_mono_map <- function() {
-  c(
+  map <- c(
     Hexp = "Hex",
     DFucp = "Fuc",
     DGalp = "Gal",
@@ -253,6 +272,26 @@ glycam_iupac_mono_map <- function() {
     LSorp = "Sor",
     DPsip = "Psi"
   )
+
+  unusual_map <- unusual_configuration_monosaccharide_map()
+  configurable <- stringr::str_detect(names(map), "^[DL]") &
+    unname(map) %in% names(unusual_map)
+  configurations <- stringr::str_sub(names(map)[configurable], 1, 1)
+  natural_monos <- unname(map[configurable])
+  map[configurable] <- apply_monosaccharide_configuration(
+    natural_monos,
+    configurations
+  )
+  unusual_sources <- names(map)[configurable]
+  stringr::str_sub(unusual_sources, 1, 1) <- invert_configuration(
+    configurations
+  )
+  map[unusual_sources] <- apply_monosaccharide_configuration(
+    natural_monos,
+    invert_configuration(configurations)
+  )
+
+  add_furanose_monosaccharide_mappings(map)
 }
 
 

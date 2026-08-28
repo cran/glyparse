@@ -5,6 +5,13 @@ test_that("auto_parse correctly identifies and parses IUPAC-condensed format", {
   expect_equal(as.character(result), as.character(expected))
 })
 
+test_that("auto_parse preserves inferred IUPAC-condensed alditols", {
+  result <- auto_parse("Glc-ol")
+
+  expect_identical(as.character(result), "Glc-ol(?1-")
+  expect_identical(unname(glyrepr::get_alditol(result)), TRUE)
+})
+
 test_that("auto_parse correctly identifies and parses IUPAC-short format", {
   input <- "Neu5Aca3Gala3(Fuca6)GlcNAcb-"
   result <- auto_parse(input)
@@ -47,6 +54,17 @@ test_that("auto_parse correctly identifies and parses Linear Code format", {
   expect_equal(as.character(result), as.character(expected))
 })
 
+test_that("auto_parse preserves furanose rings", {
+  input <- c("Galf(b1-3)GlcfNAc(b1-", "A^b3G^b")
+
+  result <- auto_parse(input)
+
+  expect_identical(
+    as.character(result),
+    c("Galf(b1-3)GlcfNAc(b1-", "Galf(b1-3)Glcf(b1-")
+  )
+})
+
 test_that("auto_parse correctly identifies and parses LINUCS format", {
   input <- "[][b-D-Glcp]{[(4+1)][b-D-Galp]{}}"
   result <- auto_parse(input)
@@ -59,6 +77,17 @@ test_that("auto_parse correctly identifies and parses GlyCAM IUPAC format", {
   result <- auto_parse(input)
   expected <- parse_glycam_iupac(input)
   expect_equal(as.character(result), as.character(expected))
+})
+
+test_that("auto_parse preserves unusual configurations", {
+  expect_identical(
+    as.character(auto_parse("DFucpa1-OH")),
+    "D-Fuc(a1-"
+  )
+  expect_identical(
+    as.character(auto_parse("D-Fuc(a1-")),
+    "D-Fuc(a1-"
+  )
 })
 
 test_that("auto_parse correctly identifies and parses IUPAC-compact format", {

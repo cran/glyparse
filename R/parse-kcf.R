@@ -7,6 +7,8 @@
 #' @param on_failure How to handle parsing failures. `"error"` aborts when a
 #'   structure cannot be parsed. `"na"` returns `NA` at invalid positions.
 #' @param progress Whether to show a progress bar while parsing.
+#' @param validate Whether to validate parsed glycan graphs before constructing
+#'   the result.
 #'
 #' @return A [glyrepr::glycan_structure()] object.
 #'
@@ -31,12 +33,18 @@
 #' parse_kcf(kcf)
 #'
 #' @export
-parse_kcf <- function(x, on_failure = "error", progress = FALSE) {
+parse_kcf <- function(
+  x,
+  on_failure = "error",
+  progress = FALSE,
+  validate = TRUE
+) {
   struc_parser_wrapper(
     x,
     do_parse_kcf,
     on_failure = on_failure,
-    progress = progress
+    progress = progress,
+    validate = validate
   )
 }
 
@@ -385,13 +393,19 @@ make_kcf_igraph <- function(vertices, glycan_edges) {
 #' @noRd
 parse_kcf_monosaccharide_label <- function(label) {
   candidates <- label
-  if (stringr::str_detect(label, "^[DL].+")) {
+  configurations <- NA_character_
+  if (stringr::str_detect(label, "^[DL](?!-).+")) {
     candidates <- c(candidates, stringr::str_sub(label, 2))
+    configurations <- c(configurations, stringr::str_sub(label, 1, 1))
   }
 
-  for (candidate in candidates) {
-    parsed <- parse_kcf_monosaccharide_candidate(candidate)
+  for (index in seq_along(candidates)) {
+    parsed <- parse_kcf_monosaccharide_candidate(candidates[[index]])
     if (!is.null(parsed)) {
+      parsed$mono <- apply_monosaccharide_configuration(
+        parsed$mono,
+        configurations[[index]]
+      )
       return(parsed)
     }
   }

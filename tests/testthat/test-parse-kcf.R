@@ -155,6 +155,59 @@ test_that("KCF parses a single monosaccharide", {
   expect_equal(result, "Glc(?1-")
 })
 
+test_that("KCF preserves unusual configurations", {
+  records <- paste0(
+    "ENTRY       test                      Glycan\n",
+    "NODE        1\n",
+    "            1   ",
+    c("LFuc", "DFuc3S", "LGul", "DFucf"),
+    "         0     0\n",
+    "///"
+  )
+
+  parsed <- parse_kcf(records)
+
+  expect_identical(
+    as.character(parsed),
+    c("Fuc(?1-", "D-Fuc3S(?1-", "L-Gul(?1-", "D-Fucf(?1-")
+  )
+})
+
+test_that("KCF parses every unusual configuration label", {
+  unusual <- unname(unusual_configuration_monosaccharide_map())
+  labels <- stringr::str_remove(unusual, stringr::fixed("-"))
+  records <- paste0(
+    "ENTRY       test                      Glycan\n",
+    "NODE        1\n",
+    "            1   ",
+    labels,
+    "         0     0\n",
+    "///"
+  )
+
+  parsed <- parse_kcf(records)
+  graphs <- glyrepr::get_structure_graphs(parsed, return_list = TRUE)
+
+  expect_identical(purrr::map_chr(graphs, ~ igraph::V(.x)$mono), unusual)
+})
+
+test_that("KCF parses every furanose monosaccharide label", {
+  furanose <- unname(furanose_monosaccharide_map())
+  records <- paste0(
+    "ENTRY       test                      Glycan\n",
+    "NODE        1\n",
+    "            1   ",
+    furanose,
+    "         0     0\n",
+    "///"
+  )
+
+  parsed <- parse_kcf(records)
+  graphs <- glyrepr::get_structure_graphs(parsed, return_list = TRUE)
+
+  expect_identical(purrr::map_chr(graphs, ~ igraph::V(.x)$mono), furanose)
+})
+
 test_that("KCF parser preserves wrapper behavior", {
   kcf <- paste0(
     "ENTRY       G00000                      Glycan\n",

@@ -2,7 +2,7 @@
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  error = TRUE
+  error = FALSE
 )
 
 ## ----setup--------------------------------------------------------------------
@@ -41,10 +41,18 @@ parse_iupac_short(iupac_short)
 
 ## -----------------------------------------------------------------------------
 iupac_extended <- paste0(
-  "α-D-Manp-(1→3)[α-D-Manp-(1→6)]-β-D-Manp-(1→4)",
-  "-β-D-GlcpNAc-(1→4)-β-D-GlcpNAc-(1→"
+  "alpha-D-Galp-(1->3)-",
+  "beta-D-Galp-(1->"
 )
 parse_iupac_extended(iupac_extended)
+
+## -----------------------------------------------------------------------------
+iupac_compact <- "Mana1-3(Mana1-6)Manb1-4GlcNAcb"
+parse_iupac_compact(iupac_compact)
+
+## -----------------------------------------------------------------------------
+glycam <- "DManpa1-3[DManpa1-6]DManpb1-4DGlcpNAcb1-OH"
+parse_glycam_iupac(glycam)
 
 ## -----------------------------------------------------------------------------
 glycoct <- paste0(
@@ -67,8 +75,39 @@ wurcs <- paste0(
 parse_wurcs(wurcs)
 
 ## -----------------------------------------------------------------------------
+kcf <- paste0(
+  "ENTRY       G00066                      Glycan\n",
+  "NODE        6\n",
+  "            1   Cer        18     0\n",
+  "            2   Glc        12     0\n",
+  "            3   Gal         6     0\n",
+  "            4   GlcNAc     -2     0\n",
+  "            5   Gal       -10     0\n",
+  "            6   GlcNAc    -18     0\n",
+  "EDGE        5\n",
+  "            1     2:b1    1:1\n",
+  "            2     3:b1    2:4\n",
+  "            3     4:b1    3:3\n",
+  "            4     5:b1    4:4\n",
+  "            5     6:b1    5:3\n",
+  "///"
+)
+parse_kcf(kcf)
+
+## -----------------------------------------------------------------------------
 linear_code <- "Ma3(Ma6)Mb4GNb4GNb"
 parse_linear_code(linear_code)
+
+## -----------------------------------------------------------------------------
+linucs <- "[][b-D-Glcp]{[(4+1)][b-D-Galp]{}}"
+parse_linucs(linucs)
+
+## -----------------------------------------------------------------------------
+gwb <- paste0(
+  "freeEnd--1b1D-GlcNAc,p(--6a1L-Fuc,p)",
+  "--4b1D-Gal,p--3a2D-NeuAc,p$MONO,Und,0,0,freeEnd"
+)
+parse_gwb(gwb)
 
 ## -----------------------------------------------------------------------------
 pglyco <- "(N(F)(N(H(H(N))(H(N(H))))))"
@@ -77,4 +116,10 @@ parse_pglyco_struc(pglyco)
 ## -----------------------------------------------------------------------------
 strucgp <- "A2B2C1D1E2F1fedD1E2edcbB5ba"
 parse_strucgp_struc(strucgp)
+
+## -----------------------------------------------------------------------------
+parse_iupac_compact(
+  c(valid = "Galb1-3GalNAca", invalid = "not a glycan"),
+  on_failure = "na"
+)
 

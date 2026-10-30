@@ -1,3 +1,18 @@
+# glyparse 1.0.0
+
+* IUPAC parsers and their `auto_parse()` paths now show parsing progress during structure construction when `progress = TRUE`. (#56)
+
+## Breaking changes
+
+* `parse_glycoct()`, `parse_kcf()`, `parse_linucs()`, `parse_pglyco_struc()`, `parse_strucgp_struc()`, and `parse_wurcs()` always validate parsed structures. Their `validate` argument is deprecated and warns when supplied; remove it from calls.
+
+## Performance improvements
+
+* Most format parsers, IUPAC converters, and automatic format detection now use native code for faster batch processing. Installing from source requires a C++17 compiler and glyrepr >= 1.2.0. (#54, #55)
+* Large native parsing and normalization batches use up to two CPU workers. Set `options(glyparse.threads = 1L)` for serial decoding or choose up to 64 workers; see `?glyparse_options`. (#55)
+* `auto_parse()` processes each detected format in a batch while preserving input order, names, missing values, and failure handling. (#54)
+* `parse_glycoct()` and `parse_wurcs()` parse large batches faster and report repeated non-root alditol warnings once per batch. (#55)
+
 # glyparse 0.8.1
 
 ## New features

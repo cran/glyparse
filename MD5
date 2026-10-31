@@ -1,7 +1,7 @@
-69054eb1afc58e98da5bebd3a6c8a7c1 *DESCRIPTION
+1d4964e2febe6e1b61d495e10120ce9a *DESCRIPTION
 6e54c335eebf332fc005cbdf45209ffe *LICENSE
 70b769dff6c96c2be1127f1d02079ad5 *NAMESPACE
-5147e2ea724d4916f28fc3d752774582 *NEWS.md
+22c87b3590724e2880fdd503b04d8ba0 *NEWS.md
 b486f8e877e489f7add9cd1a41584258 *R/RcppExports.R
 d90859e11dd63e8574c33bf792b28986 *R/auto-parse.R
 98921c891ba4f34f8f922848b9f2d1e0 *R/native.R
@@ -24,7 +24,7 @@ e4756a0421ee87dbaa7d7ef01325a869 *R/parse-strucgp.R
 599bd0e62d6f3452c05be5b16773327d *build/vignette.rds
 42b7c20c8afa883fca49feafcc051bc4 *inst/doc/glyparse.R
 171e5d6d06ecc07850f9d42af13d1914 *inst/doc/glyparse.Rmd
-c1c8328ae0b0d9b1a54be213c20eee0f *inst/doc/glyparse.html
+2876c6d1ed2153b2092a4ea69ff14ad6 *inst/doc/glyparse.html
 8ea896de2919d66b61908350d1a250c8 *man/auto_parse.Rd
 0877aec8d54b439c7e71d5d55ac0f3e0 *man/figures/logo.png
 cefcaf60fe11f800ad8204cc1d42b090 *man/glyparse_options.Rd
@@ -49,7 +49,7 @@ be579ce04c56f68d04de67e2418b002a *src/direct.cpp
 4eb7c05ce08d71471108f4f48f4bec20 *src/floating.cpp
 7fadcab66420990270d3267ba1473790 *src/glycoct.cpp
 4f0821c9352faeab261fc83439af2165 *src/gwb.cpp
-54bbc9330aec3b4c9204741d8444cbac *src/native-api.cpp
+ff8902156253c9e3fc9108fe1a82bee8 *src/native-api.cpp
 99d9a726edc9e5787318b6d6be46c358 *src/native-tables.h
 cb83c0205d210298d01331c73b8f28d2 *src/native.h
 2f625afa5ee2e3b709031c45fe9db41a *src/wurcs.cpp
@@ -71,7 +71,7 @@ b7056810d55ef706b171d5f8f9137c89 *tests/testthat/test-furanose.R
 9c33899a9d14285f537ed17137d4c686 *tests/testthat/test-mixed-residue-types.R
 a71bf6f89557dc9bfb6f67658cda43cf *tests/testthat/test-na-support.R
 4f0456882b226a97811333a4e02ef2bd *tests/testthat/test-name-preservation.R
-7b15602770864549a308786ef4d0f642 *tests/testthat/test-native.R
+06a48b9798a05993a48380d8a59764dd *tests/testthat/test-native.R
 7a15a1cc2401691e023995f49c75e6d0 *tests/testthat/test-parse-glycam-iupac.R
 265c3e9ca0a8490963b843d7b96f9d7a *tests/testthat/test-parse-glycoct.R
 987ae8a51f0da358a96caad6086e23b7 *tests/testthat/test-parse-gwb.R
